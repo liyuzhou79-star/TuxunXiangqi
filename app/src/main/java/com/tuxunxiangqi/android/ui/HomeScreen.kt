@@ -39,7 +39,8 @@ import com.tuxunxiangqi.android.R
 fun HomeScreen(
     onVsAi: () -> Unit,
     onVsFriend: () -> Unit,
-    onRecords: () -> Unit
+    onRecords: () -> Unit,
+    onEditor: () -> Unit = {}
 ) {
     // One scrollable container for the whole page (scroll audit:
     // every page must stay reachable on short screens).
@@ -105,6 +106,17 @@ fun HomeScreen(
             contentColor = MaterialTheme.colorScheme.onSurface,
             iconTint = MaterialTheme.colorScheme.primary,
             onClick = onRecords
+        )
+
+        Spacer(Modifier.height(14.dp))
+        EntryCard(
+            title = "摆棋编辑",
+            subtitle = "自己摆一个局面，从那里开始对弈或分析",
+            icon = Icons.Filled.MenuBook,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onEditor
         )
 
         Spacer(Modifier.height(14.dp))

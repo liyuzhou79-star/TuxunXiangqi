@@ -38,10 +38,10 @@ data class Piece(val type: PieceType, val side: Side)
 
 data class Move(val from: Pos, val to: Pos, val captured: Piece?)
 
-/** Outcome of a finished game: [winner] plus a plain reason string
- *  ("将死" checkmate / "困毙" stalemate — in xiangqi the side that
- *  cannot move loses either way). */
-data class GameResult(val winner: Side, val reason: String)
+/** Outcome of a finished game: [winner] (null for a draw) plus a
+ *  plain reason string ("将死" checkmate / "困毙" stalemate — in
+ *  xiangqi the side that cannot move loses either way). */
+data class GameResult(val winner: Side?, val reason: String)
 
 /**
  * Movement rules. [isPseudoLegal] covers piece geometry, blockers,
@@ -234,6 +234,13 @@ class GameState {
         get() = history.size
     private val history = ArrayList<Move>()
 
+    /** Snapshot of the position this game started from (standard
+     *  start, a handicap start, or an editor position). */
+    var initialCells: List<Piece?> = emptyList()
+        private set
+    var initialTurn: Side = Side.RED
+        private set
+
     fun historyMoves(): List<Move> = history.toList()
 
     init {
@@ -271,6 +278,8 @@ class GameState {
         history.clear()
         inCheck = false
         result = null
+        initialCells = cells.toList()
+        initialTurn = Side.RED
     }
 
     /** Loads an arbitrary position (used by tests and saved games). */
@@ -281,7 +290,31 @@ class GameState {
         turn = sideToMove
         lastMove = null
         history.clear()
+        initialCells = cells.toList()
+        initialTurn = sideToMove
         refreshStatus()
+    }
+
+    /** Starts a fresh game from [startCells] (standard start when
+     *  null), with [firstTurn] to move. Used for handicap starts and
+     *  editor positions. */
+    fun newGame(startCells: List<Piece?>?, firstTurn: Side) {
+        if (startCells == null) {
+            reset()
+            if (firstTurn != Side.RED) {
+                turn = firstTurn
+                initialTurn = firstTurn
+                refreshStatus()
+            }
+        } else {
+            loadPosition(startCells, firstTurn)
+        }
+    }
+
+    /** Ends the game from outside the rules (resignation, agreed
+     *  draw, clock timeout). [winner] is null for a draw. */
+    fun forceResult(winner: Side?, reason: String) {
+        if (result == null) result = GameResult(winner, reason)
     }
 
     /** Recomputes check / game-over for the side to move. A side with

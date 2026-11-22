@@ -87,7 +87,10 @@ fun XiangqiBoard(
     legalTargets: List<Pos>,
     onTap: (Pos) -> Unit,
     modifier: Modifier = Modifier,
-    hint: Pair<Pos, Pos>? = null
+    hint: Pair<Pos, Pos>? = null,
+    flipped: Boolean = false,
+    showCoords: Boolean = false,
+    extraHints: List<Pair<Pos, Pos>> = emptyList()
 ) {
     val measurer = rememberTextMeasurer()
     // Board geometry in cell units: grid is 8 wide x 9 tall, with a
@@ -95,29 +98,35 @@ fun XiangqiBoard(
     val marginUnits = 0.62f
     val totalW = 8f + marginUnits * 2
     val totalH = 9f + marginUnits * 2
+    fun disp(p: Pos): Pos =
+        if (flipped) Pos(8 - p.col, 9 - p.row) else p
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(totalW / totalH)
-            .pointerInput(state) {
+            .pointerInput(state, flipped) {
                 detectTapGestures { offset ->
                     val cell = size.width / totalW
                     val col = ((offset.x / cell) - marginUnits).roundToInt()
                     val row = ((offset.y / cell) - marginUnits).roundToInt()
-                    val pos = Pos(col, row)
+                    val pos = disp(Pos(col, row))
                     if (pos.inside()) onTap(pos)
                 }
             }
     ) {
         val cell = size.width / totalW
-        fun point(p: Pos) = Offset(
-            (marginUnits + p.col) * cell,
-            (marginUnits + p.row) * cell
-        )
+        fun point(p: Pos): Offset {
+            val d = disp(p)
+            return Offset(
+                (marginUnits + d.col) * cell,
+                (marginUnits + d.row) * cell
+            )
+        }
 
         drawWoodFace(cell, totalW, totalH)
         drawGrid(cell, marginUnits)
         drawRiverText(measurer, cell, marginUnits)
+        if (showCoords) drawCoords(measurer, cell, marginUnits, flipped)
 
         // Last-move markers.
         state.lastMove?.let { mv ->
@@ -149,27 +158,74 @@ fun XiangqiBoard(
         hint?.let { (from, to) ->
             drawHintArrow(point(from), point(to), cell)
         }
+        // Extra candidate arrows (ranks 2..4) in fading blue.
+        for ((from, to) in extraHints) {
+            drawHintArrow(point(from), point(to), cell, faint = true)
+        }
+    }
+}
+
+private fun DrawScope.drawCoords(
+    measurer: TextMeasurer,
+    cell: Float,
+    marginUnits: Float,
+    flipped: Boolean
+) {
+    val style = TextStyle(
+        fontWeight = FontWeight.Bold,
+        fontSize = (cell * 0.26f).toSp(),
+        color = GridInk.copy(alpha = 0.75f)
+    )
+    for (c in 0..8) {
+        val logicalCol = if (flipped) 8 - c else c
+        val label = ('a' + logicalCol).toString()
+        val layout = measurer.measure(label, style)
+        drawText(
+            textLayoutResult = layout,
+            topLeft = Offset(
+                (marginUnits + c) * cell - layout.size.width / 2f,
+                (marginUnits + 9) * cell + cell * 0.18f
+            )
+        )
+    }
+    for (r in 0..9) {
+        val logicalRow = if (flipped) 9 - r else r
+        val label = (9 - logicalRow).toString()
+        val layout = measurer.measure(label, style)
+        drawText(
+            textLayoutResult = layout,
+            topLeft = Offset(
+                cell * 0.14f,
+                (marginUnits + r) * cell - layout.size.height / 2f
+            )
+        )
     }
 }
 
 private val HintBlue = Color(0xFF1E6FB8)
 
-private fun DrawScope.drawHintArrow(from: Offset, to: Offset, cell: Float) {
+private fun DrawScope.drawHintArrow(
+    from: Offset,
+    to: Offset,
+    cell: Float,
+    faint: Boolean = false
+) {
     val r = cell * 0.46f
+    val blue = if (faint) HintBlue.copy(alpha = 0.45f) else HintBlue
     // Rings on both ends.
     drawCircle(
-        color = HintBlue,
+        color = blue,
         radius = r,
         center = from,
         style = Stroke(width = cell * 0.07f)
     )
     drawCircle(
-        color = HintBlue.copy(alpha = 0.35f),
+        color = blue.copy(alpha = 0.30f),
         radius = r,
         center = to
     )
     drawCircle(
-        color = HintBlue,
+        color = blue,
         radius = r,
         center = to,
         style = Stroke(width = cell * 0.07f)
@@ -184,7 +240,7 @@ private fun DrawScope.drawHintArrow(from: Offset, to: Offset, cell: Float) {
         val start = Offset(from.x + ux * r, from.y + uy * r)
         val end = Offset(to.x - ux * r, to.y - uy * r)
         drawLine(
-            color = HintBlue,
+            color = blue,
             start = start,
             end = end,
             strokeWidth = cell * 0.10f
@@ -194,13 +250,13 @@ private fun DrawScope.drawHintArrow(from: Offset, to: Offset, cell: Float) {
         val px = -uy
         val py = ux
         drawLine(
-            color = HintBlue,
+            color = blue,
             start = end,
             end = Offset(end.x - ux * ah + px * ah * 0.55f, end.y - uy * ah + py * ah * 0.55f),
             strokeWidth = cell * 0.10f
         )
         drawLine(
-            color = HintBlue,
+            color = blue,
             start = end,
             end = Offset(end.x - ux * ah - px * ah * 0.55f, end.y - uy * ah - py * ah * 0.55f),
             strokeWidth = cell * 0.10f

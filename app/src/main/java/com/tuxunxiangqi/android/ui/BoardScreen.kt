@@ -84,9 +84,17 @@ private fun evalText(result: EngineResult, sideToMove: Side): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BoardScreen(mode: BoardMode, onBack: () -> Unit) {
+fun BoardScreen(
+    mode: BoardMode,
+    onBack: () -> Unit,
+    startCells: List<com.tuxunxiangqi.android.xiangqi.Piece?>? = null
+) {
     val context = LocalContext.current
-    val state = remember { GameState() }
+    val state = remember {
+        GameState().apply {
+            if (startCells != null) newGame(startCells, Side.RED)
+        }
+    }
     val engine = remember { PikafishEngine(context) }
     DisposableEffect(engine) {
         onDispose { engine.close() }
@@ -394,7 +402,7 @@ fun BoardScreen(mode: BoardMode, onBack: () -> Unit) {
                     Button(
                         onClick = {
                             if (!busy) {
-                                state.reset()
+                                state.newGame(state.initialCells, state.initialTurn)
                                 selected = null
                                 clearHint()
                                 engineError = null

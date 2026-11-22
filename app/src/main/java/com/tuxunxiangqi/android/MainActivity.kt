@@ -20,8 +20,12 @@ import com.tuxunxiangqi.android.ui.RecordsScreen
 
 private sealed interface Screen {
     data object Home : Screen
-    data class Board(val mode: BoardMode) : Screen
+    data class Board(
+        val mode: BoardMode,
+        val startCells: List<com.tuxunxiangqi.android.xiangqi.Piece?>? = null
+    ) : Screen
     data object Records : Screen
+    data object Editor : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -41,14 +45,22 @@ class MainActivity : ComponentActivity() {
                         Screen.Home -> HomeScreen(
                             onVsAi = { screen = Screen.Board(BoardMode.AI) },
                             onVsFriend = { screen = Screen.Board(BoardMode.PVP) },
-                            onRecords = { screen = Screen.Records }
+                            onRecords = { screen = Screen.Records },
+                            onEditor = { screen = Screen.Editor }
                         )
                         is Screen.Board -> BoardScreen(
                             mode = s.mode,
-                            onBack = { screen = Screen.Home }
+                            onBack = { screen = Screen.Home },
+                            startCells = s.startCells
                         )
                         Screen.Records -> RecordsScreen(
                             onBack = { screen = Screen.Home }
+                        )
+                        Screen.Editor -> com.tuxunxiangqi.android.ui.EditorScreen(
+                            onBack = { screen = Screen.Home },
+                            onStart = { cells, m ->
+                                screen = Screen.Board(m, cells)
+                            }
                         )
                     }
                 }
