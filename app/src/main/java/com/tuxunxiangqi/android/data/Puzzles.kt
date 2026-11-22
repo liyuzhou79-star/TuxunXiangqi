@@ -102,7 +102,7 @@ object Puzzles {
     )
 
     /** The daily puzzle: stable within a day, rotates over the set. */
-    fun daily(dayOfYear: Int): Puzzle = all[dayOfYear % all.size]
+    fun daily(dayOfYear: Int): Puzzle = all.sortedBy { it.id }[dayOfYear % all.size]
 }
 
 /** Curated positions for the guess-the-best-move trainer, grouped

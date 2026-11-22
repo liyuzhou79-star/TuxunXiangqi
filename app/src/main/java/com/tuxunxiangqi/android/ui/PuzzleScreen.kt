@@ -92,7 +92,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(14.dp))
-        for (p in Puzzles.all) {
+        for (p in Puzzles.all.sortedBy { it.id }) {
             val solved = p.id in solvedIds
             Card(
                 colors = CardDefaults.cardColors(
