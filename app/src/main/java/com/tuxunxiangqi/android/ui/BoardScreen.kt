@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalView
+import androidx.core.view.drawToBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -740,7 +741,7 @@ fun BoardScreen(
                     OutlinedButton(
                         onClick = {
                             try {
-                                val full = androidx.core.view.drawToBitmap(rootView)
+                                val full = rootView.drawToBitmap()
                                 val x = boardPos.x.toInt().coerceIn(0, full.width - 1)
                                 val y = boardPos.y.toInt().coerceIn(0, full.height - 1)
                                 val w = boardSize.width.coerceAtMost(full.width - x)
