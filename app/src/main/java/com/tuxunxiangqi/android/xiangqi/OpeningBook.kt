@@ -27,12 +27,12 @@ object OpeningBook {
         ),
         "h2e2 h9g7" to listOf(
             "h0g2" to "马二进三",
-            "b2e2" to "炮八平五（双中炮）",
+            "b2b4" to "炮八进二",
             "a3a4" to "兵九进一"
         ),
         "h2e2 b9c7" to listOf(
             "h0g2" to "马二进三",
-            "b2e2" to "炮八平五"
+            "b2b4" to "炮八进二"
         ),
         "h2e2 h9g7 h0g2" to listOf(
             "a9a8" to "车9平8",
