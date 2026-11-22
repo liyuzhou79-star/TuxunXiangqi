@@ -76,6 +76,11 @@ fun GuessScreen(onBack: () -> Unit) {
     var wrongList by remember { mutableStateOf(wrongStore.loadAll()) }
     var rotation by remember { mutableStateOf(0) }
     var wrongFen by remember { mutableStateOf<String?>(null) }
+    // Timed mode: 30 seconds per question; running out reveals
+    // the answer and counts as a miss.
+    var timed by remember { mutableStateOf(false) }
+    var secondsLeft by remember { mutableStateOf(30) }
+    var questionId by remember { mutableStateOf(0) }
 
     fun loadPosition(fen: String, label: String, wrong: Boolean = false) {
         wrongFen = if (wrong) fen else null
@@ -93,6 +98,8 @@ fun GuessScreen(onBack: () -> Unit) {
         candidates = emptyList()
         hintMove = null
         notice = null
+        questionId++
+        secondsLeft = 30
     }
 
     fun newQuestion() {
@@ -153,10 +160,26 @@ fun GuessScreen(onBack: () -> Unit) {
 
     LaunchedEffect(source) { newQuestion() }
 
-    fun submitGuess(from: Pos, to: Pos) {
+    // Timed mode countdown: ticks only while a question is open;
+    // at zero the shared judge reveals the answer as a miss.
+    LaunchedEffect(questionId, timed, revealed) {
+        if (!timed || revealed) return@LaunchedEffect
+        while (secondsLeft > 0 && !revealed) {
+            kotlinx.coroutines.delay(1000)
+            secondsLeft--
+        }
+        if (secondsLeft == 0 && !revealed && !busy && currentFen.isNotBlank()) {
+            judge(null)
+        }
+    }
+
+    /** Shared judging for a submitted guess and for a timed-mode
+     *  timeout (guess = null). The engine's MultiPV top-4 is the
+     *  answer key either way. */
+    fun judge(guess: Pair<Pos, Pos>?) {
         if (busy || revealed) return
         busy = true
-        val guessUci = Fen.toUci(from, to)
+        val guessUci = guess?.let { Fen.toUci(it.first, it.second) }
         val fenNow = Fen.toFen(gs)
         val cellsNow = gs.cells.toList()
         val turnNow = gs.turn
@@ -174,11 +197,22 @@ fun GuessScreen(onBack: () -> Unit) {
             asked++
             revealed = true
             val guessRank = cands.firstOrNull { it.moveUci == guessUci }?.rank
-            val guessText = Notation.moveText(cellsNow, from, to)
+            val guessText = guess?.let { Notation.moveText(cellsNow, it.first, it.second) }
             val bestText = Fen.parseUciMove(best.moveUci)?.let {
                 Notation.moveText(cellsNow, it.first, it.second)
             } ?: best.moveUci
             verdict = when {
+                guessUci == null -> {
+                    SoundFx.play(context, SoundKind.BAD)
+                    if (wrongFen == null) {
+                        wrongStore.add(
+                            WrongEntry(fenNow, best.moveUci, title, System.currentTimeMillis())
+                        )
+                        wrongList = wrongStore.loadAll()
+                    }
+                    "时间到，没来得及出手。一选是「$bestText」。" +
+                        if (wrongFen == currentFen) "这题继续留在错题本里。" else "这题已收进错题本。"
+                }
                 guessUci == best.moveUci -> {
                     SoundFx.play(context, SoundKind.GOOD)
                     correct++
@@ -225,7 +259,7 @@ fun GuessScreen(onBack: () -> Unit) {
         when {
             sel != null && pos in targets -> {
                 selected = null
-                submitGuess(sel, pos)
+                judge(sel to pos)
             }
             piece != null && piece.side == gs.turn -> selected = pos
             else -> selected = null
@@ -260,11 +294,31 @@ fun GuessScreen(onBack: () -> Unit) {
             }
         }
         Spacer(Modifier.height(6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = timed,
+                onClick = { timed = !timed },
+                label = { Text("限时挑战（30 秒）") }
+            )
+        }
+        Spacer(Modifier.height(6.dp))
         Text(
             text = "本轮成绩：猜对 $correct / 共 $asked 题",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )
+        if (timed && !revealed && currentFen.isNotBlank()) {
+            Text(
+                text = "还剩 $secondsLeft 秒",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (secondsLeft <= 5) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
         if (notice != null) {
             Spacer(Modifier.height(6.dp))
             // Informational notices (empty wrong book, short
