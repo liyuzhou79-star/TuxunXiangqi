@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.Puzzle
 import com.tuxunxiangqi.android.data.Puzzles
 import com.tuxunxiangqi.android.engine.PikafishEngine
+import com.tuxunxiangqi.android.engine.SoundFx
+import com.tuxunxiangqi.android.engine.SoundKind
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
@@ -182,6 +184,24 @@ private fun PuzzlePlay(
     var demoOn by remember { mutableStateOf(false) }
     var lastJudge by remember { mutableStateOf<String?>(null) }
 
+    // Move sounds, same rule as the game screen: only when the
+    // move count grows (undo stays silent), check outranks capture.
+    var lastSoundCount by remember { mutableStateOf(0) }
+    LaunchedEffect(gs.lastMove) {
+        val mv = gs.lastMove
+        if (mv != null && gs.moveCount > lastSoundCount && gs.result == null) {
+            SoundFx.play(
+                context,
+                when {
+                    gs.inCheck -> SoundKind.CHECK
+                    mv.captured != null -> SoundKind.CAPTURE
+                    else -> SoundKind.MOVE
+                }
+            )
+        }
+        lastSoundCount = gs.moveCount
+    }
+
     fun solvedStatus(): String {
         val bestNote = when {
             bestBefore == 0 -> "这就是你的最佳成绩。"
@@ -199,6 +219,7 @@ private fun PuzzlePlay(
             if (gs.result!!.winner == Side.RED) {
                 solved = true
                 onSolved(puzzle.id, userMoves)
+                SoundFx.play(context, SoundKind.WIN)
                 status = solvedStatus()
             } else {
                 status = "这局没解出来（" + gs.result!!.reason + "）。悔棋或重开再试。"
@@ -233,6 +254,7 @@ private fun PuzzlePlay(
                         if (gs.result != null && gs.result!!.winner == Side.RED) {
                             solved = true
                             onSolved(puzzle.id, userMoves)
+                            SoundFx.play(context, SoundKind.WIN)
                             status = solvedStatus()
                         }
                     }

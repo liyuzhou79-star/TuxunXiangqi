@@ -211,7 +211,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("音效", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Text(
-                        text = "音效素材还没内置，这个开关先记住你的偏好，素材就位后自动生效。",
+                        text = "落子、吃子、将军、胜负都有短音效，全部由程序现场合成，不占素材文件。关掉就全 App 静音。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -36,6 +36,8 @@ import com.tuxunxiangqi.android.data.WrongBookStore
 import com.tuxunxiangqi.android.data.WrongEntry
 import com.tuxunxiangqi.android.engine.Candidate
 import com.tuxunxiangqi.android.engine.PikafishEngine
+import com.tuxunxiangqi.android.engine.SoundFx
+import com.tuxunxiangqi.android.engine.SoundKind
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
@@ -178,6 +180,7 @@ fun GuessScreen(onBack: () -> Unit) {
             } ?: best.moveUci
             verdict = when {
                 guessUci == best.moveUci -> {
+                    SoundFx.play(context, SoundKind.GOOD)
                     correct++
                     if (wrongFen == currentFen) {
                         wrongStore.remove(currentFen)
@@ -187,6 +190,7 @@ fun GuessScreen(onBack: () -> Unit) {
                     "猜中了！「$guessText」正是引擎一选。"
                 }
                 guessRank != null -> {
+                    SoundFx.play(context, SoundKind.BAD)
                     if (wrongFen == null) {
                         wrongStore.add(
                             WrongEntry(fenNow, best.moveUci, title, System.currentTimeMillis())
@@ -196,6 +200,7 @@ fun GuessScreen(onBack: () -> Unit) {
                     "「$guessText」进了引擎前四（第 $guessRank 位），但一选是「$bestText」。这题已收进错题本。"
                 }
                 else -> {
+                    SoundFx.play(context, SoundKind.BAD)
                     if (wrongFen == null) {
                         wrongStore.add(
                             WrongEntry(fenNow, best.moveUci, title, System.currentTimeMillis())

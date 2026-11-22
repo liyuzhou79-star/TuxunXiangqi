@@ -50,6 +50,8 @@ import com.tuxunxiangqi.android.data.SettingsStore
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.engine.Candidate
 import com.tuxunxiangqi.android.engine.PikafishEngine
+import com.tuxunxiangqi.android.engine.SoundFx
+import com.tuxunxiangqi.android.engine.SoundKind
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
@@ -261,6 +263,36 @@ fun BoardScreen(
         if (state.result != null && state.moveCount > 0 && !finalSaved) {
             finalSaved = true
             saveRecord(final = true)
+        }
+    }
+
+    // Sound effects: only when the move count actually grows, so
+    // undo and restart stay silent. Check outranks capture.
+    var lastSoundCount by remember { mutableStateOf(0) }
+    LaunchedEffect(state.lastMove) {
+        val mv = state.lastMove
+        if (mv != null && state.moveCount > lastSoundCount && state.result == null) {
+            SoundFx.play(
+                context,
+                when {
+                    state.inCheck -> SoundKind.CHECK
+                    mv.captured != null -> SoundKind.CAPTURE
+                    else -> SoundKind.MOVE
+                }
+            )
+        }
+        lastSoundCount = state.moveCount
+    }
+    LaunchedEffect(state.result) {
+        val res = state.result ?: return@LaunchedEffect
+        when {
+            res.winner == null -> SoundFx.play(context, SoundKind.GOOD)
+            mode == BoardMode.AI ->
+                SoundFx.play(
+                    context,
+                    if (res.winner == humanSide) SoundKind.WIN else SoundKind.LOSE
+                )
+            else -> SoundFx.play(context, SoundKind.WIN)
         }
     }
 

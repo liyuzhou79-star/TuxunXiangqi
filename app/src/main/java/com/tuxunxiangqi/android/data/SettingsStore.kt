@@ -27,10 +27,10 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("analysisMs", 2000)
         set(value) = prefs.edit().putInt("analysisMs", value).apply()
 
-    /** Sound effects are not bundled yet; the switch only records
-     *  the preference for now (the settings page says so plainly). */
+    /** Sound effects are synthesized in code (no audio files);
+     *  on by default, this switch turns them off everywhere. */
     var soundOn: Boolean
-        get() = prefs.getBoolean("soundOn", false)
+        get() = prefs.getBoolean("soundOn", true)
         set(value) = prefs.edit().putBoolean("soundOn", value).apply()
 
     fun toJson(): JSONObject {
