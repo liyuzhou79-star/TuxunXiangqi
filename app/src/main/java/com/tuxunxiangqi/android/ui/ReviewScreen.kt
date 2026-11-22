@@ -36,7 +36,6 @@ import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
-import com.tuxunxiangqi.android.xiangqi.MoveRecord
 import com.tuxunxiangqi.android.xiangqi.Notation
 import com.tuxunxiangqi.android.xiangqi.Piece
 import com.tuxunxiangqi.android.xiangqi.Side
@@ -52,7 +51,7 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     val context = LocalContext.current
     val engine = remember { PikafishEngine(context) }
     DisposableEffect(engine) { onDispose { engine.close() } }
-    LaunchedEffect(Unit) { engine.start() }
+    LaunchedEffect(Unit) { engine.start({}, {}) }
     val scope = rememberCoroutineScope()
 
     val total = record.movesUci.size
@@ -68,12 +67,11 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         val notations = ArrayList<String>()
         snapshots.add(scratch.cells.toList() to scratch.turn)
         for (uci in record.movesUci) {
-            val ft = Fen.parseUci(uci)
+            val ft = Fen.parseUciMove(uci)
             if (ft == null) break
             val (from, to) = ft
-            notations.add(Notation.moveText(scratch.cells, scratch.turn, from, to))
-            val captured = scratch.cells[to.row * 9 + to.col]
-            if (!scratch.applyMove(MoveRecord(from, to, captured))) break
+            notations.add(Notation.moveText(scratch.cells, from, to))
+            if (!scratch.tryMove(from, to)) break
             snapshots.add(scratch.cells.toList() to scratch.turn)
         }
         snapshots to notations
@@ -144,9 +142,9 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                     val scratch = GameState()
                     val snap = snapshots[idx]
                     scratch.newGame(snap.first, snap.second)
-                    val ft = Fen.parseUci(best.moveUci)
+                    val ft = Fen.parseUciMove(best.moveUci)
                     val bestText = if (ft != null) {
-                        Notation.moveText(scratch.cells, scratch.turn, ft.first, ft.second)
+                        Notation.moveText(scratch.cells, ft.first, ft.second)
                     } else {
                         best.moveUci
                     }

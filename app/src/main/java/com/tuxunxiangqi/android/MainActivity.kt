@@ -58,7 +58,12 @@ class MainActivity : ComponentActivity() {
                             startCells = s.startCells
                         )
                         Screen.Records -> RecordsScreen(
-                            onBack = { screen = Screen.Home }
+                            onBack = { screen = Screen.Home },
+                            onOpenReview = { record -> screen = Screen.Review(record) }
+                        )
+                        is Screen.Review -> ReviewScreen(
+                            record = s.record,
+                            onBack = { screen = Screen.Records }
                         )
                         Screen.Editor -> com.tuxunxiangqi.android.ui.EditorScreen(
                             onBack = { screen = Screen.Home },
