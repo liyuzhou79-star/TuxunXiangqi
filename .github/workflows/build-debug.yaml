@@ -147,8 +147,12 @@ jobs:
       - name: Run unit tests
         run: |
           set +e
-          ./gradlew testDebugUnitTest --stacktrace
-          code=$?
+          ./gradlew testDebugUnitTest --stacktrace --console=plain 2>&1 | tee gradle-test.log
+          code=${PIPESTATUS[0]}
+          grep -E "^e: |^w: " gradle-test.log | head -60 || true
+          grep -E "^e: " gradle-test.log | head -40 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
           if [ "$code" != "0" ]; then
             echo "===== UNIT TEST RESULTS ====="
             for f in app/build/test-results/testDebugUnitTest/*.xml; do
