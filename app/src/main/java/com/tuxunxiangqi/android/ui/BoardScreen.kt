@@ -1,6 +1,7 @@
 package com.tuxunxiangqi.android.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -36,10 +37,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tuxunxiangqi.android.data.GameRecord
+import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.engine.Candidate
 import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
@@ -129,6 +135,12 @@ fun BoardScreen(
     DisposableEffect(engine) {
         onDispose { engine.close() }
     }
+    val recordStore = remember { RecordStore(context) }
+    var savedRecordId by remember { mutableStateOf<Long?>(null) }
+    var finalSaved by remember { mutableStateOf(false) }
+    val rootView = LocalView.current
+    var boardPos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var boardSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
 
     var selected by remember { mutableStateOf<Pos?>(null) }
     // Setup.
@@ -187,6 +199,55 @@ fun BoardScreen(
         candidates = emptyList()
         hintMove = null
         selectedRank = 1
+    }
+
+    fun currentRecord(final: Boolean): GameRecord {
+        val res = state.result
+        val resultText = when {
+            res != null -> (when (res.winner) {
+                Side.RED -> "红方胜"
+                Side.BLACK -> "黑方胜"
+                null -> "和棋"
+            }) + " · " + res.reason
+            final -> "对局结束"
+            else -> "对局进行中"
+        }
+        val modeLabel = when (mode) {
+            BoardMode.AI -> "人机对弈 · " + level.label +
+                (if (handicap != Handicap.NONE) " · " + handicap.label else "")
+            BoardMode.PVP -> "人人对弈"
+            BoardMode.SPECTACLE -> "AI 表演赛"
+        }
+        val fmt = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA)
+        return GameRecord(
+            id = savedRecordId ?: System.currentTimeMillis(),
+            title = fmt.format(java.util.Date()) + " " + modeLabel,
+            dateMs = System.currentTimeMillis(),
+            modeLabel = modeLabel,
+            resultText = resultText,
+            initialFen = Fen.toFen(state.initialCells, state.initialTurn),
+            movesUci = state.historyMoves().map { Fen.toUci(it.from, it.to) },
+            evals = evalPoints.toMap()
+        )
+    }
+
+    fun saveRecord(final: Boolean) {
+        if (state.moveCount == 0) {
+            notice = "还没有走子，先下一会儿再存吧。"
+            return
+        }
+        val rec = currentRecord(final)
+        savedRecordId = rec.id
+        recordStore.save(rec)
+        notice = "棋谱已保存，去首页「棋谱」里就能找到。"
+    }
+
+    // Finished games save themselves.
+    LaunchedEffect(state.result) {
+        if (state.result != null && state.moveCount > 0 && !finalSaved) {
+            finalSaved = true
+            saveRecord(final = true)
+        }
     }
 
     fun engineMove() {
@@ -338,6 +399,8 @@ fun BoardScreen(
 
     fun restart() {
         if (busy) return
+        savedRecordId = null
+        finalSaved = false
         state.newGame(state.initialCells, state.initialTurn)
         selected = null
         clearAnalysis()
@@ -599,17 +662,24 @@ fun BoardScreen(
                     Spacer(Modifier.height(12.dp))
                 }
 
-                BoardFrame(modifier = Modifier.fillMaxWidth()) {
-                    XiangqiBoard(
-                        state = state,
-                        selected = selected,
-                        legalTargets = targets,
-                        hint = hintMove,
-                        extraHints = extraHints,
-                        flipped = flipped,
-                        showCoords = showCoords,
-                        onTap = { pos -> onTap(pos) }
-                    )
+                Box(
+                    modifier = Modifier.onGloballyPositioned { coords ->
+                        boardPos = coords.positionInWindow()
+                        boardSize = coords.size
+                    }
+                ) {
+                    BoardFrame(modifier = Modifier.fillMaxWidth()) {
+                        XiangqiBoard(
+                            state = state,
+                            selected = selected,
+                            legalTargets = targets,
+                            hint = hintMove,
+                            extraHints = extraHints,
+                            flipped = flipped,
+                            showCoords = showCoords,
+                            onTap = { pos -> onTap(pos) }
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -660,6 +730,29 @@ fun BoardScreen(
                     }
                     OutlinedButton(onClick = { restart() }) {
                         Text("重开")
+                    }
+                    OutlinedButton(
+                        onClick = { saveRecord(final = state.result != null) },
+                        enabled = !busy
+                    ) {
+                        Text("存谱")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val full = androidx.core.view.drawToBitmap(rootView)
+                                val x = boardPos.x.toInt().coerceIn(0, full.width - 1)
+                                val y = boardPos.y.toInt().coerceIn(0, full.height - 1)
+                                val w = boardSize.width.coerceAtMost(full.width - x)
+                                val h = boardSize.height.coerceAtMost(full.height - y)
+                                val cropped = android.graphics.Bitmap.createBitmap(full, x, y, w, h)
+                                shareBitmap(context, cropped, "将！局面图")
+                            } catch (_: Exception) {
+                                notice = "局面图生成失败，请再试一次。"
+                            }
+                        }
+                    ) {
+                        Text("分享局面")
                     }
                     if (mode != BoardMode.SPECTACLE) {
                         OutlinedButton(
