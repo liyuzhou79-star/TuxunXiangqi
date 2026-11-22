@@ -17,13 +17,13 @@ object OpeningBook {
         "h2e2" to listOf(
             "h9g7" to "马8进7",
             "b9c7" to "马2进3",
-            "b2e2" to "炮8平5（顺炮）",
+            "b7e7" to "炮8平5（顺炮）",
             "c6c5" to "卒3进1"
         ),
         "b2e2" to listOf(
             "b9c7" to "马2进3",
             "h9g7" to "马8进7",
-            "h2e2" to "炮2平5（顺炮）"
+            "h7e7" to "炮2平5（顺炮）"
         ),
         "h2e2 h9g7" to listOf(
             "h0g2" to "马二进三",
@@ -36,12 +36,12 @@ object OpeningBook {
         ),
         "h2e2 h9g7 h0g2" to listOf(
             "a9a8" to "车9平8",
-            "b2e2" to "炮8平5",
+            "b7e7" to "炮8平5",
             "i9i8" to "车1平2"
         ),
         "g3g4" to listOf(
             "c6c5" to "卒3进1（对兵局）",
-            "b8d8" to "炮2平3",
+            "b7d7" to "炮2平3",
             "c9e7" to "象3进5"
         ),
         "g3g4 c6c5" to listOf(
