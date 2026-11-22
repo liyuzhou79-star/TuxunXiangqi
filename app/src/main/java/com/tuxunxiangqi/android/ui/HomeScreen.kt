@@ -99,6 +99,32 @@ fun HomeScreen(
             onClick = onVsAi
         )
         Spacer(Modifier.height(14.dp))
+        // Daily puzzle card.
+        val daily = Puzzles.daily(Calendar.getInstance().get(Calendar.DAY_OF_YEAR))
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "今日一题 · " + daily.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = daily.hint,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(onClick = onPuzzles) { Text("去解今日一题") }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
         EntryCard(
             title = "人人对弈",
             subtitle = "和朋友在同一块棋盘上对弈，还能请引擎给一选",

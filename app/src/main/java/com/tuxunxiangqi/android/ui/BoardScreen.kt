@@ -126,7 +126,8 @@ private fun fmtClock(ms: Long): String {
 fun BoardScreen(
     mode: BoardMode,
     onBack: () -> Unit,
-    startCells: List<Piece?>? = null
+    startCells: List<Piece?>? = null,
+    onReviewRecord: (Long) -> Unit = {}
 ) {
     val context = LocalContext.current
     val state = remember {
@@ -749,6 +750,11 @@ fun BoardScreen(
                         enabled = !busy
                     ) {
                         Text("存谱")
+                    }
+                    if (state.result != null && savedRecordId != null) {
+                        Button(onClick = { onReviewRecord(savedRecordId!!) }) {
+                            Text("复盘这局")
+                        }
                     }
                     OutlinedButton(
                         onClick = {

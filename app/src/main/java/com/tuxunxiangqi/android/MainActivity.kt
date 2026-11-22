@@ -87,7 +87,13 @@ class MainActivity : ComponentActivity() {
                         is Screen.Board -> BoardScreen(
                             mode = s.mode,
                             onBack = { screen = Screen.Home },
-                            startCells = s.startCells
+                            startCells = s.startCells,
+                            onReviewRecord = { id ->
+                                val rec = com.tuxunxiangqi.android.data.RecordStore(
+                                    applicationContext
+                                ).loadAll().firstOrNull { it.id == id }
+                                if (rec != null) screen = Screen.Review(rec)
+                            }
                         )
                         Screen.Records -> RecordsScreen(
                             onBack = { screen = Screen.Home },
