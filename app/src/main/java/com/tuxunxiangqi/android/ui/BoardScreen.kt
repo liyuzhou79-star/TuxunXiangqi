@@ -1,19 +1,18 @@
 package com.tuxunxiangqi.android.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -24,7 +23,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -34,60 +35,89 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.tuxunxiangqi.android.engine.EngineResult
+import com.tuxunxiangqi.android.engine.Candidate
 import com.tuxunxiangqi.android.engine.PikafishEngine
+import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
+import com.tuxunxiangqi.android.xiangqi.Notation
+import com.tuxunxiangqi.android.xiangqi.Piece
+import com.tuxunxiangqi.android.xiangqi.PieceType
 import com.tuxunxiangqi.android.xiangqi.Pos
 import com.tuxunxiangqi.android.xiangqi.Rules
 import com.tuxunxiangqi.android.xiangqi.Side
+import kotlinx.coroutines.delay
 
-enum class BoardMode { AI, PVP }
+enum class BoardMode { AI, PVP, SPECTACLE }
 
-/** Difficulty levels: thinking time per move, plus a depth cap on
- *  the casual level so it stays genuinely casual. */
 private enum class Level(val label: String, val hint: String, val movetimeMs: Int, val depthCap: Int?) {
     CASUAL("休闲", "每步约 0.3 秒，随便玩玩", 300, 8),
     NORMAL("普通", "每步约 1 秒，棋力已经很强", 1000, null),
     EXPERT("高手", "每步约 3 秒，全力思考", 3000, null)
 }
 
-/** Turns an engine score (side-to-move point of view) into a plain
- *  sentence from Red's point of view. */
-private fun evalText(result: EngineResult, sideToMove: Side): String {
-    val sign = if (sideToMove == Side.RED) 1 else -1
-    val mate = result.mateIn?.times(sign)
-    if (mate != null) {
-        return if (mate > 0) {
-            "红方有将杀的机会，约 $mate 步内见分晓。"
-        } else {
-            "黑方有将杀的机会，约 ${-mate} 步内见分晓。"
-        }
-    }
-    val cp = (result.scoreCp ?: 0) * sign
-    val pawns = kotlin.math.abs(cp) / 100.0
-    val pawnsText = String.format("%.1f", pawns)
-    return when {
-        cp >= 50 -> "红方占优，约合 $pawnsText 个兵。"
-        cp <= -50 -> "黑方占优，约合 $pawnsText 个兵。"
-        cp >= 15 -> "局势接近，红方稍好一点。"
-        cp <= -15 -> "局势接近，黑方稍好一点。"
-        else -> "局势基本均势。"
-    }
+private enum class Handicap(val label: String) {
+    NONE("不让子"), ONE_HORSE("让一马"), TWO_HORSES("让双马"),
+    ONE_CHARIOT("让一车"), BIG("让车马炮")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private enum class SpecSpeed(val label: String, val movetimeMs: Int) {
+    SLOW("慢速", 2000), MID("中速", 900), FAST("快速", 350)
+}
+
+private data class CandidateUi(
+    val rank: Int,
+    val from: Pos,
+    val to: Pos,
+    val title: String,
+    val scoreText: String,
+    val pvText: String,
+    val redWinPercent: Double
+)
+
+/** Removes the handicap pieces from [side] on a fresh start layout. */
+private fun applyHandicap(cells: List<Piece?>, side: Side, handicap: Handicap): List<Piece?> {
+    if (handicap == Handicap.NONE) return cells
+    val out = cells.toMutableList()
+    val backRow = if (side == Side.BLACK) 0 else 9
+    val cannonRow = if (side == Side.BLACK) 2 else 7
+    fun clear(col: Int, row: Int, type: PieceType) {
+        val p = out[row * 9 + col]
+        if (p != null && p.side == side && p.type == type) out[row * 9 + col] = null
+    }
+    when (handicap) {
+        Handicap.ONE_HORSE -> clear(1, backRow, PieceType.HORSE)
+        Handicap.TWO_HORSES -> {
+            clear(1, backRow, PieceType.HORSE)
+            clear(7, backRow, PieceType.HORSE)
+        }
+        Handicap.ONE_CHARIOT -> clear(0, backRow, PieceType.CHARIOT)
+        Handicap.BIG -> {
+            clear(0, backRow, PieceType.CHARIOT)
+            clear(1, backRow, PieceType.HORSE)
+            clear(1, cannonRow, PieceType.CANNON)
+        }
+        Handicap.NONE -> {}
+    }
+    return out
+}
+
+private fun fmtClock(ms: Long): String {
+    val totalSec = (ms.coerceAtLeast(0) + 999) / 1000
+    return String.format("%d:%02d", totalSec / 60, totalSec % 60)
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun BoardScreen(
     mode: BoardMode,
     onBack: () -> Unit,
-    startCells: List<com.tuxunxiangqi.android.xiangqi.Piece?>? = null
+    startCells: List<Piece?>? = null
 ) {
     val context = LocalContext.current
     val state = remember {
@@ -101,36 +131,82 @@ fun BoardScreen(
     }
 
     var selected by remember { mutableStateOf<Pos?>(null) }
-    // AI game setup.
+    // Setup.
     var setupDone by remember { mutableStateOf(mode == BoardMode.PVP) }
     var humanSide by remember { mutableStateOf(Side.RED) }
     var level by remember { mutableStateOf(Level.NORMAL) }
-    // Engine state.
+    var handicap by remember { mutableStateOf(Handicap.NONE) }
+    var specSpeed by remember { mutableStateOf(SpecSpeed.MID) }
+    var spectaclePaused by remember { mutableStateOf(false) }
+    // Clock.
+    var clockMinutes by remember { mutableStateOf(0) }
+    var redMs by remember { mutableStateOf(0L) }
+    var blackMs by remember { mutableStateOf(0L) }
+    var clockPaused by remember { mutableStateOf(false) }
+    // View.
+    var flipped by remember { mutableStateOf(false) }
+    var showCoords by remember { mutableStateOf(false) }
+    var focusMode by remember { mutableStateOf(false) }
+    // Engine / analysis.
     var thinking by remember { mutableStateOf(false) }
     var engineError by remember { mutableStateOf<String?>(null) }
-    var hintBusy by remember { mutableStateOf(false) }
+    var analysisBusy by remember { mutableStateOf(false) }
+    var candidates by remember { mutableStateOf<List<CandidateUi>>(emptyList()) }
+    var selectedRank by remember { mutableStateOf(1) }
     var hintMove by remember { mutableStateOf<Pair<Pos, Pos>?>(null) }
-    var hintText by remember { mutableStateOf<String?>(null) }
+    var autoAnalyze by remember { mutableStateOf(false) }
+    var analysisMs by remember { mutableStateOf(1000f) }
+    var evalPoints by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
+    var lastRedCp by remember { mutableStateOf<Int?>(null) }
+    var showTrendDialog by remember { mutableStateOf(false) }
+    // Dialogs / messages.
+    var showResignDialog by remember { mutableStateOf(false) }
+    var showDrawDialog by remember { mutableStateOf(false) }
+    var notice by remember { mutableStateOf<String?>(null) }
 
-    val busy = thinking || hintBusy
-    val humanTurn = mode == BoardMode.PVP || state.turn == humanSide
-    val targets = remember(selected, state.lastMove) {
+    val busy = thinking || analysisBusy
+    val humanTurn = when (mode) {
+        BoardMode.PVP -> true
+        BoardMode.AI -> state.turn == humanSide
+        BoardMode.SPECTACLE -> false
+    }
+    val targets = remember(selected, state.lastMove, state.moveCount) {
         selected?.let { Rules.legalTargets(state.cells, it) } ?: emptyList()
     }
+    val extraHints = candidates
+        .filter { it.rank != selectedRank }
+        .map { it.from to it.to }
 
-    fun clearHint() {
+    fun addEvalPoint(moveCount: Int, redCp: Int) {
+        val cleaned = evalPoints.filter { it.first != moveCount }
+        evalPoints = (cleaned + (moveCount to redCp)).sortedBy { it.first }
+        lastRedCp = redCp
+    }
+
+    fun clearAnalysis() {
+        candidates = emptyList()
         hintMove = null
-        hintText = null
+        selectedRank = 1
     }
 
     fun engineMove() {
-        if (mode != BoardMode.AI || !setupDone) return
-        if (state.result != null || state.turn == humanSide || thinking) return
+        if (!setupDone || state.result != null || thinking) return
+        val isEngineTurn = when (mode) {
+            BoardMode.AI -> state.turn != humanSide
+            BoardMode.SPECTACLE -> !spectaclePaused
+            BoardMode.PVP -> false
+        }
+        if (!isEngineTurn) return
         thinking = true
         engineError = null
-        clearHint()
         val fen = Fen.toFen(state)
-        engine.compute(fen, level.movetimeMs, level.depthCap) { res, err ->
+        val engineSide = state.turn
+        val movetime = when (mode) {
+            BoardMode.SPECTACLE -> specSpeed.movetimeMs
+            else -> level.movetimeMs
+        }
+        val cap = if (mode == BoardMode.AI) level.depthCap else null
+        engine.compute(fen, movetime, cap) { res, err ->
             thinking = false
             when {
                 err != null -> engineError = err
@@ -140,61 +216,143 @@ fun BoardScreen(
                         engineError = "引擎给的着法对不上棋盘，请重开一局。"
                     } else {
                         selected = null
+                        clearAnalysis()
+                        val (redCp, redMate) = EvalUtil.toRedPerspective(
+                            res.scoreCp, res.mateIn, engineSide
+                        )
+                        addEvalPoint(
+                            state.moveCount,
+                            redMate?.let { if (it > 0) 1500 else -1500 }
+                                ?: (redCp ?: 0)
+                        )
                     }
                 }
             }
         }
     }
 
-    LaunchedEffect(state.lastMove, setupDone) {
+    LaunchedEffect(state.lastMove, setupDone, spectaclePaused) {
         engineMove()
     }
 
-    fun askHint() {
-        if (busy || state.result != null) return
-        hintBusy = true
-        hintText = "引擎正在算，请稍等…"
-        hintMove = null
+    fun runAnalysis() {
+        if (busy || state.result != null || !setupDone) return
+        analysisBusy = true
         engineError = null
+        notice = null
         val fen = Fen.toFen(state)
         val sideToMove = state.turn
+        val cellsSnapshot = state.cells.toList()
         val atMove = state.moveCount
-        val movetime = if (mode == BoardMode.AI) level.movetimeMs else 1000
-        val cap = if (mode == BoardMode.AI) level.depthCap else null
-        engine.compute(fen, movetime, cap) { res, err ->
-            hintBusy = false
+        engine.analyze(fen, analysisMs.toInt(), multiPv = 4) { res, err ->
+            analysisBusy = false
             if (state.moveCount != atMove) {
-                // The position moved on while the engine was thinking;
-                // a stale hint would point at the wrong move.
-                clearHint()
-                return@compute
+                // Position moved on; stale candidates would mislead.
+                return@analyze
             }
             when {
-                err != null -> {
-                    hintText = null
-                    engineError = err
-                }
+                err != null -> engineError = err
                 res != null -> {
-                    val mv = Fen.parseUciMove(res.bestMoveUci)
-                    if (mv == null) {
-                        hintText = null
-                        engineError = "引擎给的着法看不懂，请再试一次。"
-                    } else {
-                        hintMove = mv
-                        hintText = "一选已在棋盘上标出。" + evalText(res, sideToMove)
+                    val built = ArrayList<CandidateUi>()
+                    for (cand: Candidate in res.candidates) {
+                        val mv = Fen.parseUciMove(cand.moveUci) ?: continue
+                        val (redCp, redMate) = EvalUtil.toRedPerspective(
+                            cand.scoreCp, cand.mateIn, sideToMove
+                        )
+                        built.add(
+                            CandidateUi(
+                                rank = cand.rank,
+                                from = mv.first,
+                                to = mv.second,
+                                title = Notation.moveText(cellsSnapshot, mv.first, mv.second),
+                                scoreText = EvalUtil.describeRed(redCp, redMate),
+                                pvText = Notation.pvText(cellsSnapshot, cand.pvUci, 5)
+                                    .joinToString(" "),
+                                redWinPercent = EvalUtil.winRatePercent(redCp, redMate)
+                            )
+                        )
+                    }
+                    candidates = built
+                    selectedRank = 1
+                    hintMove = built.firstOrNull()?.let { it.from to it.to }
+                    val best = res.candidates.firstOrNull()
+                    if (best != null) {
+                        val (redCp, redMate) = EvalUtil.toRedPerspective(
+                            best.scoreCp, best.mateIn, sideToMove
+                        )
+                        addEvalPoint(
+                            atMove,
+                            redMate?.let { if (it > 0) 1500 else -1500 }
+                                ?: (redCp ?: 0)
+                        )
                     }
                 }
             }
         }
+    }
+
+    // Continuous analysis: follow every move automatically, but
+    // never fight the engine for its own turn.
+    LaunchedEffect(state.lastMove, autoAnalyze) {
+        if (autoAnalyze && setupDone && state.result == null && !thinking &&
+            (mode == BoardMode.PVP || (mode == BoardMode.AI && state.turn == humanSide))
+        ) {
+            runAnalysis()
+        }
+    }
+
+    // Chess clock: counts down the side to move; timeout loses.
+    LaunchedEffect(clockMinutes, state.turn, clockPaused, state.result, setupDone) {
+        if (clockMinutes <= 0 || !setupDone || state.result != null || clockPaused) {
+            return@LaunchedEffect
+        }
+        var last = System.currentTimeMillis()
+        while (true) {
+            delay(200)
+            val now = System.currentTimeMillis()
+            val elapsed = now - last
+            last = now
+            if (state.result != null) break
+            if (state.turn == Side.RED) {
+                redMs -= elapsed
+                if (redMs <= 0) {
+                    redMs = 0
+                    state.forceResult(Side.BLACK, "红方超时")
+                    break
+                }
+            } else {
+                blackMs -= elapsed
+                if (blackMs <= 0) {
+                    blackMs = 0
+                    state.forceResult(Side.RED, "黑方超时")
+                    break
+                }
+            }
+        }
+    }
+
+    fun resetClocks() {
+        redMs = clockMinutes * 60_000L
+        blackMs = clockMinutes * 60_000L
+    }
+
+    fun restart() {
+        if (busy) return
+        state.newGame(state.initialCells, state.initialTurn)
+        selected = null
+        clearAnalysis()
+        evalPoints = emptyList()
+        engineError = null
+        notice = null
+        resetClocks()
     }
 
     fun undo() {
         if (busy) return
         selected = null
-        clearHint()
+        clearAnalysis()
         engineError = null
         if (mode == BoardMode.AI) {
-            // Take back the engine's move together with the human's.
             var guard = 0
             while (guard < 200) {
                 if (!state.undo()) break
@@ -203,7 +361,9 @@ fun BoardScreen(
             }
         } else {
             state.undo()
+            if (mode == BoardMode.SPECTACLE) state.undo()
         }
+        evalPoints = evalPoints.filter { it.first <= state.moveCount }
     }
 
     fun onTap(pos: Pos) {
@@ -219,33 +379,37 @@ fun BoardScreen(
             else -> {
                 if (state.tryMove(sel, pos)) {
                     selected = null
-                    clearHint()
+                    clearAnalysis()
                 }
             }
         }
     }
 
+    val title = when (mode) {
+        BoardMode.AI -> "人机对弈"
+        BoardMode.PVP -> "人人对弈"
+        BoardMode.SPECTACLE -> "AI 表演赛"
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(if (mode == BoardMode.AI) "人机对弈" else "人人对弈")
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Text("←", fontSize = 22.sp)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+            if (!focusMode) {
+                TopAppBar(
+                    title = { Text(title) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Text("←", fontSize = 22.sp)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground
+                    )
                 )
-            )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        // The whole page is one scrollable column: on short screens
-        // the board, buttons and texts must all stay reachable.
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -253,54 +417,95 @@ fun BoardScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
-            if (mode == BoardMode.AI && !setupDone) {
-                SetupSection(
-                    humanSide = humanSide,
-                    onSideChange = { humanSide = it },
-                    level = level,
-                    onLevelChange = { level = it },
-                    onStart = {
-                        setupDone = true
-                        engineError = null
-                        engine.start(
-                            onReady = {},
-                            onError = { msg -> engineError = msg }
-                        )
-                    }
-                )
-            } else {
-                // Turn status.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (state.turn == Side.RED)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onBackground
-                            )
+            if (!setupDone) {
+                when (mode) {
+                    BoardMode.AI -> SetupAiSection(
+                        humanSide = humanSide,
+                        onSideChange = {
+                            humanSide = it
+                            flipped = it == Side.BLACK
+                        },
+                        level = level,
+                        onLevelChange = { level = it },
+                        handicap = handicap,
+                        onHandicapChange = { handicap = it },
+                        clockMinutes = clockMinutes,
+                        onClockChange = { clockMinutes = it },
+                        customStart = startCells != null,
+                        onStart = {
+                            if (startCells == null && handicap != Handicap.NONE) {
+                                val base = GameState()
+                                val engineSide = humanSide.other()
+                                val modified = applyHandicap(base.cells, engineSide, handicap)
+                                state.newGame(modified, Side.RED)
+                            }
+                            resetClocks()
+                            setupDone = true
+                            engine.start(onReady = {}, onError = { msg -> engineError = msg })
+                        }
                     )
-                    Spacer(Modifier.size(8.dp))
+                    BoardMode.SPECTACLE -> SetupSpectacleSection(
+                        specSpeed = specSpeed,
+                        onSpeedChange = { specSpeed = it },
+                        onStart = {
+                            setupDone = true
+                            engine.start(onReady = {}, onError = { msg -> engineError = msg })
+                        }
+                    )
+                    BoardMode.PVP -> {}
+                }
+            } else if (focusMode) {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { focusMode = false },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("退出专注")
+                    }
+                    OutlinedButton(
+                        onClick = { undo() },
+                        enabled = state.lastMove != null && !busy,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("悔棋")
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                BoardFrame(modifier = Modifier.fillMaxWidth()) {
+                    XiangqiBoard(
+                        state = state,
+                        selected = selected,
+                        legalTargets = targets,
+                        hint = hintMove,
+                        extraHints = extraHints,
+                        flipped = flipped,
+                        showCoords = showCoords,
+                        onTap = { pos -> onTap(pos) }
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+            } else {
+                // Status row.
+                Row(modifier = Modifier.padding(vertical = 8.dp)) {
                     Text(
                         text = when {
-                            state.result != null ->
-                                if (state.result!!.winner == Side.RED) "红方胜" else "黑方胜"
+                            state.result != null -> when (state.result!!.winner) {
+                                Side.RED -> "红方胜"
+                                Side.BLACK -> "黑方胜"
+                                null -> "和棋"
+                            }
                             thinking -> "引擎思考中…"
-                            mode == BoardMode.AI && !humanTurn -> "引擎走棋"
+                            mode == BoardMode.SPECTACLE && spectaclePaused -> "表演赛已暂停"
                             state.turn == Side.RED -> "红方走棋"
                             else -> "黑方走棋"
                         },
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
                     if (state.result == null && state.inCheck) {
-                        Spacer(Modifier.size(8.dp))
                         Text(
-                            text = "将军！",
+                            text = " · 将军！",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -313,7 +518,7 @@ fun BoardScreen(
                     )
                 }
 
-                if (thinking) {
+                if (thinking || analysisBusy) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(8.dp))
                 }
@@ -326,8 +531,11 @@ fun BoardScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = (if (res.winner == Side.RED) "红方胜" else "黑方胜") +
-                                " · " + res.reason,
+                            text = (when (res.winner) {
+                                Side.RED -> "红方胜"
+                                Side.BLACK -> "黑方胜"
+                                null -> "和棋"
+                            }) + " · " + res.reason,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(12.dp)
@@ -353,18 +561,7 @@ fun BoardScreen(
                     Spacer(Modifier.height(12.dp))
                 }
 
-                BoardFrame(modifier = Modifier.fillMaxWidth()) {
-                    XiangqiBoard(
-                        state = state,
-                        selected = selected,
-                        legalTargets = targets,
-                        hint = hintMove,
-                        onTap = { pos -> onTap(pos) }
-                    )
-                }
-
-                hintText?.let { text ->
-                    Spacer(Modifier.height(12.dp))
+                notice?.let { msg ->
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -372,53 +569,228 @@ fun BoardScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = text,
+                            text = msg,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.padding(12.dp)
                         )
                     }
+                    Spacer(Modifier.height(12.dp))
                 }
 
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                if (clockMinutes > 0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ClockCard(
+                            label = "红方",
+                            ms = redMs,
+                            active = state.turn == Side.RED && state.result == null,
+                            modifier = Modifier.weight(1f)
+                        )
+                        ClockCard(
+                            label = "黑方",
+                            ms = blackMs,
+                            active = state.turn == Side.BLACK && state.result == null,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedButton(onClick = { clockPaused = !clockPaused }) {
+                            Text(if (clockPaused) "继续" else "暂停")
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                BoardFrame(modifier = Modifier.fillMaxWidth()) {
+                    XiangqiBoard(
+                        state = state,
+                        selected = selected,
+                        legalTargets = targets,
+                        hint = hintMove,
+                        extraHints = extraHints,
+                        flipped = flipped,
+                        showCoords = showCoords,
+                        onTap = { pos -> onTap(pos) }
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+                // View toggles.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = flipped,
+                        onClick = { flipped = !flipped },
+                        label = { Text("翻转棋盘") }
+                    )
+                    FilterChip(
+                        selected = showCoords,
+                        onClick = { showCoords = !showCoords },
+                        label = { Text("坐标") }
+                    )
+                    FilterChip(
+                        selected = focusMode,
+                        onClick = { focusMode = true },
+                        label = { Text("专注模式") }
+                    )
+                    FilterChip(
+                        selected = autoAnalyze,
+                        onClick = { autoAnalyze = !autoAnalyze },
+                        label = { Text("自动分析") }
+                    )
+                    if (mode == BoardMode.SPECTACLE) {
+                        FilterChip(
+                            selected = spectaclePaused,
+                            onClick = { spectaclePaused = !spectaclePaused },
+                            label = { Text(if (spectaclePaused) "已暂停" else "暂停表演") }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = { undo() },
-                        enabled = state.lastMove != null && !busy,
-                        modifier = Modifier.weight(1f)
+                        enabled = state.lastMove != null && !busy
                     ) {
                         Text("悔棋")
                     }
-                    OutlinedButton(
-                        onClick = { askHint() },
-                        enabled = state.result == null && !busy,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("AI 一选")
-                    }
                     Button(
-                        onClick = {
-                            if (!busy) {
-                                state.newGame(state.initialCells, state.initialTurn)
-                                selected = null
-                                clearHint()
-                                engineError = null
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
+                        onClick = { runAnalysis() },
+                        enabled = state.result == null && !busy
                     ) {
+                        Text("分析")
+                    }
+                    OutlinedButton(onClick = { restart() }) {
                         Text("重开")
+                    }
+                    if (mode != BoardMode.SPECTACLE) {
+                        OutlinedButton(
+                            onClick = { showResignDialog = true },
+                            enabled = state.result == null && !busy
+                        ) {
+                            Text("认输")
+                        }
+                        OutlinedButton(
+                            onClick = { showDrawDialog = true },
+                            enabled = state.result == null && !busy
+                        ) {
+                            Text("求和")
+                        }
+                    }
+                }
+
+                if (mode == BoardMode.PVP && state.moveCount == 0) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "棋钟（开局前选好）",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (m in listOf(0, 10, 20, 30)) {
+                            FilterChip(
+                                selected = clockMinutes == m,
+                                onClick = {
+                                    clockMinutes = m
+                                    redMs = m * 60_000L
+                                    blackMs = m * 60_000L
+                                },
+                                label = { Text(if (m == 0) "不限时" else "$m 分钟") }
+                            )
+                        }
+                    }
+                }
+
+                // Analysis panel.
+                Spacer(Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "形势与候选",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        val best = candidates.firstOrNull()
+                        if (best == null) {
+                            Text(
+                                text = "点「分析」，引擎会给出前四个候选着法、各自的形势判断和后续变化。" +
+                                    "打开「自动分析」后，每走一步都会自动跟算。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                text = "红方胜率约 ${best.redWinPercent.toInt()}% · ${best.scoreText}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            LinearProgressIndicator(
+                                progress = { (best.redWinPercent / 100.0).toFloat() },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            for (cand in candidates) {
+                                CandidateRow(
+                                    cand = cand,
+                                    chosen = cand.rank == selectedRank,
+                                    onClick = {
+                                        selectedRank = cand.rank
+                                        hintMove = cand.from to cand.to
+                                    }
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "分析思考时长：${(analysisMs / 1000f).let { String.format("%.1f", it) }} 秒",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Slider(
+                            value = analysisMs,
+                            onValueChange = { analysisMs = it },
+                            valueRange = 200f..4000f,
+                            steps = 18
+                        )
+                    }
+                }
+
+                // Trend chart.
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    onClick = { if (evalPoints.size >= 2) showTrendDialog = true },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "局内走势（红方分数）",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        if (evalPoints.size < 2) {
+                            Text(
+                                text = "对局中引擎每算一次就会记一个点，连成线就能看出形势在哪几手翻盘。点这里看大图。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            EvalTrendChart(points = evalPoints)
+                        }
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "点选棋子，再点高亮处落子。规则已校验：蹩马腿、塞象眼、" +
-                        "炮须隔子吃、九宫与过河限制、将帅照面；不能送将，被将军时必须应将。" +
-                        "「AI 一选」会请引擎算一步，并把推荐着法标在棋盘上。",
+                    text = "点选棋子，再点高亮处落子。规则已校验：蹩马腿、塞象眼、炮须隔子吃、" +
+                        "九宫与过河限制、将帅照面；不能送将，被将军时必须应将。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -426,24 +798,208 @@ fun BoardScreen(
             }
         }
     }
+
+    if (showResignDialog) {
+        AlertDialog(
+            onDismissRequest = { showResignDialog = false },
+            title = { Text("认输？") },
+            text = { Text("认输后这一局就结束了，确定吗？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResignDialog = false
+                    val loser = if (mode == BoardMode.AI) humanSide else state.turn
+                    state.forceResult(loser.other(), "认输")
+                }) {
+                    Text("认输")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResignDialog = false }) {
+                    Text("再想想")
+                }
+            }
+        )
+    }
+
+    if (showDrawDialog) {
+        if (mode == BoardMode.PVP) {
+            AlertDialog(
+                onDismissRequest = { showDrawDialog = false },
+                title = { Text("提议和棋") },
+                text = { Text("请把手机递给对方：同意和棋吗？") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDrawDialog = false
+                        state.forceResult(null, "双方同意和棋")
+                    }) {
+                        Text("同意和棋")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDrawDialog = false }) {
+                        Text("不同意，继续下")
+                    }
+                }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { showDrawDialog = false },
+                title = { Text("向引擎求和？") },
+                text = {
+                    Text("引擎只在局势接近、或者它并不占优的时候才会同意和棋。")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDrawDialog = false
+                        val humanCp = lastRedCp?.let {
+                            if (humanSide == Side.RED) it else -it
+                        }
+                        if (humanCp != null && humanCp >= -80) {
+                            state.forceResult(null, "引擎同意和棋")
+                        } else {
+                            notice = "引擎拒绝了和棋：现在的局势对它更有利，或者还没有算清。"
+                        }
+                    }) {
+                        Text("求和")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDrawDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
+    }
+
+    if (showTrendDialog) {
+        AlertDialog(
+            onDismissRequest = { showTrendDialog = false },
+            title = { Text("局内走势大图") },
+            text = {
+                Column {
+                    EvalTrendChart(points = evalPoints, big = true)
+                    Spacer(Modifier.height(10.dp))
+                    val swings = keySwings(evalPoints)
+                    if (swings.isEmpty()) {
+                        Text("还没有出现大起大落的手，形势变化比较平稳。")
+                    } else {
+                        Text("关键手（分数大起大落处）：", fontWeight = FontWeight.SemiBold)
+                        for ((moveIdx, _, delta) in swings.take(5)) {
+                            val pawns = String.format("%.1f", kotlin.math.abs(delta) / 100.0)
+                            Text(
+                                text = "第 $moveIdx 手后，形势变化约 $pawns 个兵" +
+                                    (if (delta > 0) "（转向红方）" else "（转向黑方）")
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTrendDialog = false }) {
+                    Text("关闭")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ClockCard(label: String, ms: Long, active: Boolean, modifier: Modifier = Modifier) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (active) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            }
+        ),
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = fmtClock(ms),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SetupSection(
+private fun CandidateRow(cand: CandidateUi, chosen: Boolean, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = if (chosen) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            }
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row {
+                Text(
+                    text = when (cand.rank) {
+                        1 -> "一选"
+                        2 -> "二选"
+                        3 -> "三选"
+                        else -> "四选"
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = cand.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = cand.scoreText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (cand.pvText.isNotBlank()) {
+                Text(
+                    text = "变化：${cand.pvText}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun SetupAiSection(
     humanSide: Side,
     onSideChange: (Side) -> Unit,
     level: Level,
     onLevelChange: (Level) -> Unit,
+    handicap: Handicap,
+    onHandicapChange: (Handicap) -> Unit,
+    clockMinutes: Int,
+    onClockChange: (Int) -> Unit,
+    customStart: Boolean,
     onStart: () -> Unit
 ) {
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text(
-            text = "你执哪一方？",
-            style = MaterialTheme.typography.titleMedium
-        )
+        Text(text = "你执哪一方？", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = humanSide == Side.RED,
                 onClick = { onSideChange(Side.RED) },
@@ -452,16 +1008,13 @@ private fun SetupSection(
             FilterChip(
                 selected = humanSide == Side.BLACK,
                 onClick = { onSideChange(Side.BLACK) },
-                label = { Text("执黑后行") }
+                label = { Text("执黑后行（让先）") }
             )
         }
         Spacer(Modifier.height(20.dp))
-        Text(
-            text = "引擎档位",
-            style = MaterialTheme.typography.titleMedium
-        )
+        Text(text = "引擎档位", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (lv in Level.entries) {
                 FilterChip(
                     selected = level == lv,
@@ -476,11 +1029,34 @@ private fun SetupSection(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (!customStart) {
+            Spacer(Modifier.height(20.dp))
+            Text(text = "让子（引擎让）", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (h in Handicap.entries) {
+                    FilterChip(
+                        selected = handicap == h,
+                        onClick = { onHandicapChange(h) },
+                        label = { Text(h.label) }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Text(text = "棋钟", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (m in listOf(0, 10, 20, 30)) {
+                FilterChip(
+                    selected = clockMinutes == m,
+                    onClick = { onClockChange(m) },
+                    label = { Text(if (m == 0) "不限时" else "$m 分钟") }
+                )
+            }
+        }
         Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onStart,
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
             Text("开始对弈")
         }
         Spacer(Modifier.height(12.dp))
@@ -490,5 +1066,36 @@ private fun SetupSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun SetupSpectacleSection(
+    specSpeed: SpecSpeed,
+    onSpeedChange: (SpecSpeed) -> Unit,
+    onStart: () -> Unit
+) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Text(
+            text = "两台引擎自己对弈，你在旁边看。可以随时暂停、调速、悔棋看前面。",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Spacer(Modifier.height(20.dp))
+        Text(text = "落子速度", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (sp in SpecSpeed.entries) {
+                FilterChip(
+                    selected = specSpeed == sp,
+                    onClick = { onSpeedChange(sp) },
+                    label = { Text(sp.label) }
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+            Text("开始表演赛")
+        }
     }
 }

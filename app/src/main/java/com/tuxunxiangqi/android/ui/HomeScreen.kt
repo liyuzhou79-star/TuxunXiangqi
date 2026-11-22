@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -40,7 +41,8 @@ fun HomeScreen(
     onVsAi: () -> Unit,
     onVsFriend: () -> Unit,
     onRecords: () -> Unit,
-    onEditor: () -> Unit = {}
+    onEditor: () -> Unit = {},
+    onSpectacle: () -> Unit = {}
 ) {
     // One scrollable container for the whole page (scroll audit:
     // every page must stay reachable on short screens).
@@ -108,6 +110,16 @@ fun HomeScreen(
             onClick = onRecords
         )
 
+        Spacer(Modifier.height(14.dp))
+        EntryCard(
+            title = "AI 表演赛",
+            subtitle = "两台引擎自弈对打，你在旁边看，还能暂停调速",
+            icon = Icons.Filled.Star,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onSpectacle
+        )
         Spacer(Modifier.height(14.dp))
         EntryCard(
             title = "摆棋编辑",

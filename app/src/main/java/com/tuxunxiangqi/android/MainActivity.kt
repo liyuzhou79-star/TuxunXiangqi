@@ -46,7 +46,8 @@ class MainActivity : ComponentActivity() {
                             onVsAi = { screen = Screen.Board(BoardMode.AI) },
                             onVsFriend = { screen = Screen.Board(BoardMode.PVP) },
                             onRecords = { screen = Screen.Records },
-                            onEditor = { screen = Screen.Editor }
+                            onEditor = { screen = Screen.Editor },
+                            onSpectacle = { screen = Screen.Board(BoardMode.SPECTACLE) }
                         )
                         is Screen.Board -> BoardScreen(
                             mode = s.mode,
