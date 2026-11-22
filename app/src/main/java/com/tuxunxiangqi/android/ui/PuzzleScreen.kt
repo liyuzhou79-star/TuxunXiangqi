@@ -62,10 +62,18 @@ fun PuzzleScreen(onBack: () -> Unit) {
         PuzzlePlay(
             puzzle = playing!!,
             onExit = { playing = null },
-            onSolved = { id ->
+            onSolved = { id, steps ->
                 val next = solvedIds + id
                 solvedIds = next
-                prefs.edit().putStringSet("solved", next.map { it.toString() }.toSet()).apply()
+                val editor = prefs.edit()
+                    .putStringSet("solved", next.map { it.toString() }.toSet())
+                // Best (fewest) user moves for this puzzle; demo
+                // solves pass steps = null and never count.
+                if (steps != null && steps > 0) {
+                    val old = prefs.getInt("best_$id", 0)
+                    if (old == 0 || steps < old) editor.putInt("best_$id", steps)
+                }
+                editor.apply()
             }
         )
         return
@@ -117,6 +125,18 @@ fun PuzzleScreen(onBack: () -> Unit) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (solved) {
+                        val best = prefs.getInt("best_${p.id}", 0)
+                        if (best > 0) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "最佳成绩：$best 步解出",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(10.dp))
                     OutlinedButton(onClick = { playing = p }) {
                         Text(if (solved) "再解一次" else "开始解题")
@@ -135,9 +155,15 @@ fun PuzzleScreen(onBack: () -> Unit) {
 private fun PuzzlePlay(
     puzzle: Puzzle,
     onExit: () -> Unit,
-    onSolved: (Int) -> Unit
+    /** steps = the user's own move count on a genuine solve;
+     *  null when the demo solved it (never a personal best). */
+    onSolved: (Int, Int?) -> Unit
 ) {
     val context = LocalContext.current
+    val bestBefore = remember(puzzle.id) {
+        context.getSharedPreferences("puzzles", Context.MODE_PRIVATE)
+            .getInt("best_${puzzle.id}", 0)
+    }
     val engine = remember { PikafishEngine(context) }
     DisposableEffect(engine) { onDispose { engine.close() } }
     LaunchedEffect(Unit) { engine.start({}, {}) }
@@ -156,14 +182,24 @@ private fun PuzzlePlay(
     var demoOn by remember { mutableStateOf(false) }
     var lastJudge by remember { mutableStateOf<String?>(null) }
 
+    fun solvedStatus(): String {
+        val bestNote = when {
+            bestBefore == 0 -> "这就是你的最佳成绩。"
+            userMoves < bestBefore -> "比之前的最佳（$bestBefore 步）还快！"
+            userMoves == bestBefore -> "追平了你的最佳成绩。"
+            else -> "你的最佳是 $bestBefore 步，下次试着更快解出。"
+        }
+        return "解出来了！共用 $userMoves 步。黑方" + gs.result!!.reason + "。" + bestNote
+    }
+
     fun afterUserMove() {
         userMoves++
         selected = null
         if (gs.result != null) {
             if (gs.result!!.winner == Side.RED) {
                 solved = true
-                onSolved(puzzle.id)
-                status = "解出来了！共用 $userMoves 步。黑方" + gs.result!!.reason + "。"
+                onSolved(puzzle.id, userMoves)
+                status = solvedStatus()
             } else {
                 status = "这局没解出来（" + gs.result!!.reason + "）。悔棋或重开再试。"
             }
@@ -196,8 +232,8 @@ private fun PuzzlePlay(
                         status = "黑方走了「$text」。" + (lastJudge ?: "")
                         if (gs.result != null && gs.result!!.winner == Side.RED) {
                             solved = true
-                            onSolved(puzzle.id)
-                            status = "解出来了！共用 $userMoves 步。黑方" + gs.result!!.reason + "。"
+                            onSolved(puzzle.id, userMoves)
+                            status = solvedStatus()
                         }
                     }
                 } else if (eerr != null) {
@@ -225,7 +261,7 @@ private fun PuzzlePlay(
                             demoOn = false
                             if (gs.result!!.winner == Side.RED) {
                                 solved = true
-                                onSolved(puzzle.id)
+                                onSolved(puzzle.id, null)
                                 status = "演示结束：红方胜（" + gs.result!!.reason + "）。轮到你自己解一次。"
                             } else {
                                 status = "演示结束：红方没赢——这题比演示的路线更讲究，自己试试。"
