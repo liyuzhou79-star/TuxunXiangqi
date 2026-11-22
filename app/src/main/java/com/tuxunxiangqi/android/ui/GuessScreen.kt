@@ -160,19 +160,6 @@ fun GuessScreen(onBack: () -> Unit) {
 
     LaunchedEffect(source) { newQuestion() }
 
-    // Timed mode countdown: ticks only while a question is open;
-    // at zero the shared judge reveals the answer as a miss.
-    LaunchedEffect(questionId, timed, revealed) {
-        if (!timed || revealed) return@LaunchedEffect
-        while (secondsLeft > 0 && !revealed) {
-            kotlinx.coroutines.delay(1000)
-            secondsLeft--
-        }
-        if (secondsLeft == 0 && !revealed && !busy && currentFen.isNotBlank()) {
-            judge(null)
-        }
-    }
-
     /** Shared judging for a submitted guess and for a timed-mode
      *  timeout (guess = null). The engine's MultiPV top-4 is the
      *  answer key either way. */
@@ -244,6 +231,21 @@ fun GuessScreen(onBack: () -> Unit) {
                     "「$guessText」没进引擎前四。一选是「$bestText」。这题已收进错题本。"
                 }
             }
+        }
+    }
+
+    // Timed mode countdown: ticks only while a question is open;
+    // at zero the shared judge reveals the answer as a miss.
+    // (Declared after judge — Kotlin local functions cannot be
+    // referenced before their declaration.)
+    LaunchedEffect(questionId, timed, revealed) {
+        if (!timed || revealed) return@LaunchedEffect
+        while (secondsLeft > 0 && !revealed) {
+            kotlinx.coroutines.delay(1000)
+            secondsLeft--
+        }
+        if (secondsLeft == 0 && !revealed && !busy && currentFen.isNotBlank()) {
+            judge(null)
         }
     }
 
