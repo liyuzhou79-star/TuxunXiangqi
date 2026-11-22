@@ -16,7 +16,9 @@ import com.tuxunxiangqi.android.ui.BoardMode
 import com.tuxunxiangqi.android.ui.BoardScreen
 import com.tuxunxiangqi.android.ui.HomeScreen
 import com.tuxunxiangqi.android.ui.JiangTheme
+import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.ui.RecordsScreen
+import com.tuxunxiangqi.android.ui.ReviewScreen
 
 private sealed interface Screen {
     data object Home : Screen
@@ -25,6 +27,7 @@ private sealed interface Screen {
         val startCells: List<com.tuxunxiangqi.android.xiangqi.Piece?>? = null
     ) : Screen
     data object Records : Screen
+    data class Review(val record: GameRecord) : Screen
     data object Editor : Screen
 }
 
