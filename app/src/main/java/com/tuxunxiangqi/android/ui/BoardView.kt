@@ -86,7 +86,8 @@ fun XiangqiBoard(
     selected: Pos?,
     legalTargets: List<Pos>,
     onTap: (Pos) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hint: Pair<Pos, Pos>? = null
 ) {
     val measurer = rememberTextMeasurer()
     // Board geometry in cell units: grid is 8 wide x 9 tall, with a
@@ -144,6 +145,66 @@ fun XiangqiBoard(
                 drawPiece(measurer, point(pos), cell * 0.44f, piece, pos == selected)
             }
         }
+        // Engine hint arrow, drawn on top so it stays readable.
+        hint?.let { (from, to) ->
+            drawHintArrow(point(from), point(to), cell)
+        }
+    }
+}
+
+private val HintBlue = Color(0xFF1E6FB8)
+
+private fun DrawScope.drawHintArrow(from: Offset, to: Offset, cell: Float) {
+    val r = cell * 0.46f
+    // Rings on both ends.
+    drawCircle(
+        color = HintBlue,
+        radius = r,
+        center = from,
+        style = Stroke(width = cell * 0.07f)
+    )
+    drawCircle(
+        color = HintBlue.copy(alpha = 0.35f),
+        radius = r,
+        center = to
+    )
+    drawCircle(
+        color = HintBlue,
+        radius = r,
+        center = to,
+        style = Stroke(width = cell * 0.07f)
+    )
+    // Shaft, shortened so it does not hide the pieces.
+    val dx = to.x - from.x
+    val dy = to.y - from.y
+    val len = kotlin.math.sqrt(dx * dx + dy * dy)
+    if (len > 1f) {
+        val ux = dx / len
+        val uy = dy / len
+        val start = Offset(from.x + ux * r, from.y + uy * r)
+        val end = Offset(to.x - ux * r, to.y - uy * r)
+        drawLine(
+            color = HintBlue,
+            start = start,
+            end = end,
+            strokeWidth = cell * 0.10f
+        )
+        // Arrowhead.
+        val ah = cell * 0.30f
+        val px = -uy
+        val py = ux
+        drawLine(
+            color = HintBlue,
+            start = end,
+            end = Offset(end.x - ux * ah + px * ah * 0.55f, end.y - uy * ah + py * ah * 0.55f),
+            strokeWidth = cell * 0.10f
+        )
+        drawLine(
+            color = HintBlue,
+            start = end,
+            end = Offset(end.x - ux * ah - px * ah * 0.55f, end.y - uy * ah - py * ah * 0.55f),
+            strokeWidth = cell * 0.10f
+        )
     }
 }
 
