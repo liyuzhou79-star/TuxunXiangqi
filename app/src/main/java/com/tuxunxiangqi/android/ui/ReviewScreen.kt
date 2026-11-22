@@ -103,22 +103,12 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         gs
     }
 
-    // Recorded evals as a dense series for the trend chart.
+    // Recorded evals as (moveCount, redCp) points for the chart.
     val trendPoints = remember(record.id) {
-        if (record.evals.isEmpty()) {
-            emptyList()
-        } else {
-            val maxKey = record.evals.keys.max()
-            val out = ArrayList<Int>()
-            var last = 0
-            for (k in 0..maxKey) {
-                record.evals[k]?.let { last = it }
-                out.add(last)
-            }
-            out
-        }
+        record.evals.entries.sortedBy { it.key }.map { it.key to it.value }
     }
     val swings = remember(trendPoints) { keySwings(trendPoints) }
+    val swingMoves = remember(swings) { swings.map { it.first } }
 
     fun compareWithEngine() {
         if (compareBusy) return
@@ -128,28 +118,32 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         }
         compareBusy = true
         compareText = "引擎正在看这一手……"
-        scope.launch {
-            val cands = engine.analyze(Fen.toFen(displayState), 600)
+        engine.analyze(Fen.toFen(displayState), 600, multiPv = 1) { res, err ->
             compareBusy = false
-            val best = cands.firstOrNull()
-            compareText = if (best == null) {
-                "引擎暂时没给出候选（可能需要真机再确认引擎状态）。"
-            } else {
-                val actualText = notations.getOrNull(idx) ?: actualUci
-                if (best.moveUci == actualUci) {
-                    "实战的「$actualText」正是引擎一选，眼光很准。"
-                } else {
-                    val scratch = GameState()
-                    val snap = snapshots[idx]
-                    scratch.newGame(snap.first, snap.second)
-                    val ft = Fen.parseUciMove(best.moveUci)
-                    val bestText = if (ft != null) {
-                        Notation.moveText(scratch.cells, ft.first, ft.second)
+            val best = res?.candidates?.firstOrNull()
+            compareText = when {
+                err != null -> "引擎没能完成分析：$err"
+                best == null -> "引擎暂时没给出候选。"
+                else -> {
+                    val actualText = notations.getOrNull(idx) ?: actualUci
+                    if (best.moveUci == actualUci) {
+                        "实战的「$actualText」正是引擎一选，眼光很准。"
                     } else {
-                        best.moveUci
+                        val scratch = GameState()
+                        val snap = snapshots[idx]
+                        scratch.newGame(snap.first, snap.second)
+                        val ft = Fen.parseUciMove(best.moveUci)
+                        val bestText = if (ft != null) {
+                            Notation.moveText(scratch.cells, ft.first, ft.second)
+                        } else {
+                            best.moveUci
+                        }
+                        val (redCp, redMate) = EvalUtil.toRedPerspective(
+                            best.scoreCp, best.mateIn, displayState.turn
+                        )
+                        "实战走了「$actualText」，引擎一选是「$bestText」：" +
+                            EvalUtil.describeRed(redCp, redMate)
                     }
-                    "实战走了「$actualText」，引擎一选是「$bestText」：" +
-                        EvalUtil.describe(best.redScoreCp(displayState.turn))
                 }
             }
         }
@@ -178,7 +172,7 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
             XiangqiBoard(
                 state = displayState,
                 selected = null,
-                legalTargets = emptySet(),
+                legalTargets = emptyList(),
                 hint = null,
                 onTap = {}
             )
@@ -207,7 +201,7 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                 if (evalHere != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "这一步的形势：" + EvalUtil.describe(evalHere),
+                        text = "这一步的形势：" + EvalUtil.describeRed(evalHere, null),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -240,9 +234,10 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                         onClick = { compareWithEngine() },
                         enabled = !compareBusy
                     ) { Text("和引擎一选对比") }
-                    if (swings.isNotEmpty()) {
+                    if (swingMoves.isNotEmpty()) {
                         OutlinedButton(onClick = {
-                            val next = swings.firstOrNull { it > idx } ?: swings.first()
+                            val next = swingMoves.firstOrNull { it > idx }
+                                ?: swingMoves.first()
                             idx = next.coerceAtMost(maxIdx)
                         }) { Text("下一关键手") }
                     }
