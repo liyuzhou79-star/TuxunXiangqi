@@ -53,6 +53,45 @@ object OpeningBook {
             "c9e7" to "象3进5",
             "b9c7" to "马2进3",
             "g6g5" to "兵7进1"
+        ),
+        "b2e2 b9c7" to listOf(
+            "h0g2" to "马二进三",
+            "a3a4" to "兵九进一"
+        ),
+        "b2e2 h9g7" to listOf(
+            "h0g2" to "马二进三",
+            "g3g4" to "兵七进一"
+        ),
+        "h2e2 b7e7" to listOf(
+            "h0g2" to "马二进三",
+            "b0c2" to "马八进七",
+            "b2b4" to "炮八进二"
+        ),
+        "h2e2 h9g7 h0g2 a9a8" to listOf(
+            "b0c2" to "马八进七",
+            "a3a4" to "兵九进一",
+            "i0h0" to "车一平二"
+        ),
+        "h2e2 h9g7 h0g2 b7e7" to listOf(
+            "a0a2" to "车九进二",
+            "g3g4" to "兵七进一"
+        ),
+        "g3g4 c6c5 g4g5" to listOf(
+            "h9g7" to "马8进7",
+            "b7e7" to "炮8平5"
+        ),
+        "c0e2 c9e7" to listOf(
+            "b2b4" to "炮八进二",
+            "h0g2" to "马二进三",
+            "g3g4" to "兵七进一"
+        ),
+        "h2e2 c6c5" to listOf(
+            "h0g2" to "马二进三",
+            "b2b4" to "炮八进二"
+        ),
+        "g3g4 b7d7" to listOf(
+            "h0g2" to "马二进三",
+            "h2e2" to "炮二平五"
         )
     )
 
