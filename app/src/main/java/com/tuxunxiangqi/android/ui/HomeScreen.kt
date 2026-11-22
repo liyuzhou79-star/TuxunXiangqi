@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
@@ -49,7 +50,8 @@ fun HomeScreen(
     onSpectacle: () -> Unit = {},
     onGuess: () -> Unit = {},
     onPuzzles: () -> Unit = {},
-    onGuide: () -> Unit = {}
+    onGuide: () -> Unit = {},
+    onSettings: () -> Unit = {}
 ) {
     // One scrollable container for the whole page (scroll audit:
     // every page must stay reachable on short screens).
@@ -156,6 +158,16 @@ fun HomeScreen(
             contentColor = MaterialTheme.colorScheme.onSurface,
             iconTint = MaterialTheme.colorScheme.primary,
             onClick = onGuide
+        )
+        Spacer(Modifier.height(14.dp))
+        EntryCard(
+            title = "设置",
+            subtitle = "主题、默认难度、数据备份与恢复、检查更新、战绩",
+            icon = Icons.Filled.Settings,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onSettings
         )
         Spacer(Modifier.height(14.dp))
         EntryCard(

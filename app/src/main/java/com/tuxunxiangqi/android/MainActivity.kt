@@ -21,7 +21,14 @@ import com.tuxunxiangqi.android.ui.RecordsScreen
 import com.tuxunxiangqi.android.ui.GuessScreen
 import com.tuxunxiangqi.android.ui.GuideScreen
 import com.tuxunxiangqi.android.ui.PuzzleScreen
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import com.tuxunxiangqi.android.data.SettingsStore
+import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.ui.ReviewScreen
+import com.tuxunxiangqi.android.ui.SettingsScreen
+import com.tuxunxiangqi.android.ui.StatsScreen
 
 private sealed interface Screen {
     data object Home : Screen
@@ -35,13 +42,28 @@ private sealed interface Screen {
     data object Guide : Screen
     data class Review(val record: GameRecord) : Screen
     data object Editor : Screen
+    data object Settings : Screen
+    data object Stats : Screen
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            JiangTheme {
+            var themeMode by remember { mutableStateOf(SettingsStore(this).themeMode) }
+            val warmContext = LocalContext.current
+            LaunchedEffect(Unit) {
+                // Pre-warm: copy the NNUE file and boot the engine
+                // once so the first game starts without the wait.
+                val warm = PikafishEngine(warmContext)
+                warm.start({ warm.close() }, { warm.close() })
+            }
+            val dark = when (themeMode) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemInDarkTheme()
+            }
+            JiangTheme(darkTheme = dark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -59,7 +81,8 @@ class MainActivity : ComponentActivity() {
                             onSpectacle = { screen = Screen.Board(BoardMode.SPECTACLE) },
                             onGuess = { screen = Screen.Guess },
                             onPuzzles = { screen = Screen.Puzzles },
-                            onGuide = { screen = Screen.Guide }
+                            onGuide = { screen = Screen.Guide },
+                            onSettings = { screen = Screen.Settings }
                         )
                         is Screen.Board -> BoardScreen(
                             mode = s.mode,
@@ -75,6 +98,14 @@ class MainActivity : ComponentActivity() {
                         )
                         Screen.Puzzles -> PuzzleScreen(
                             onBack = { screen = Screen.Home }
+                        )
+                        Screen.Settings -> SettingsScreen(
+                            onBack = { screen = Screen.Home },
+                            onOpenStats = { screen = Screen.Stats },
+                            onThemeChanged = { themeMode = it }
+                        )
+                        Screen.Stats -> StatsScreen(
+                            onBack = { screen = Screen.Settings }
                         )
                         Screen.Guide -> GuideScreen(
                             onBack = { screen = Screen.Home }
