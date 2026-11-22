@@ -2,24 +2,27 @@ package com.tuxunxiangqi.android
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
+import com.tuxunxiangqi.android.ui.BoardMode
+import com.tuxunxiangqi.android.ui.BoardScreen
+import com.tuxunxiangqi.android.ui.HomeScreen
 import com.tuxunxiangqi.android.ui.JiangTheme
+import com.tuxunxiangqi.android.ui.RecordsScreen
+
+private sealed interface Screen {
+    data object Home : Screen
+    data class Board(val mode: BoardMode) : Screen
+    data object Records : Screen
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,37 +33,26 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SplashPlaceholder()
+                    var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+                    BackHandler(enabled = screen != Screen.Home) {
+                        screen = Screen.Home
+                    }
+                    when (val s = screen) {
+                        Screen.Home -> HomeScreen(
+                            onVsAi = { screen = Screen.Board(BoardMode.AI) },
+                            onVsFriend = { screen = Screen.Board(BoardMode.PVP) },
+                            onRecords = { screen = Screen.Records }
+                        )
+                        is Screen.Board -> BoardScreen(
+                            mode = s.mode,
+                            onBack = { screen = Screen.Home }
+                        )
+                        Screen.Records -> RecordsScreen(
+                            onBack = { screen = Screen.Home }
+                        )
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SplashPlaceholder() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        // In-app display of the launcher artwork uses the bitmap copy
-        // in drawable-nodpi; painterResource on the mipmap adaptive
-        // icon XML crashes on Android 8+.
-        Image(
-            painter = painterResource(R.drawable.ic_launcher_art),
-            contentDescription = null,
-            modifier = Modifier.size(120.dp)
-        )
-        Spacer(Modifier.height(16.dp))
-        Text("将！", style = MaterialTheme.typography.displayMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "0.1.0 · 骨架搭建中",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }

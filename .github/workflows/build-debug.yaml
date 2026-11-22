@@ -18,6 +18,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
