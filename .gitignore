@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+app/build
+local.properties
+*.keystore
+# The pinned test-signing keystore is a throwaway debug key and is
+# committed on purpose so every CI build signs identically.
+!tools/test-signing.keystore
+keystore.properties
+# Built/downloaded by CI at build time, never committed
+app/src/main/jniLibs/
+app/src/main/assets/engine/
