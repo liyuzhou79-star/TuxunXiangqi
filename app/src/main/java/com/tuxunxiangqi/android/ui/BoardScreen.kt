@@ -50,6 +50,7 @@ fun BoardScreen(mode: BoardMode, onBack: () -> Unit) {
     }
 
     fun onTap(pos: Pos) {
+        if (state.result != null) return
         val piece = state.pieceAt(pos)
         val sel = selected
         when {
@@ -110,12 +111,38 @@ fun BoardScreen(mode: BoardMode, onBack: () -> Unit) {
                     text = if (state.turn == Side.RED) "红方走棋" else "黑方走棋",
                     style = MaterialTheme.typography.titleMedium
                 )
+                if (state.result == null && state.inCheck) {
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        text = "将军！",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "第 ${state.moveCount + 1} 手",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            state.result?.let { res ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = (if (res.winner == Side.RED) "红方胜" else "黑方胜") +
+                            " · " + res.reason,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
             }
 
             if (mode == BoardMode.AI) {
@@ -167,8 +194,8 @@ fun BoardScreen(mode: BoardMode, onBack: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "点选棋子，再点高亮处落子。基础规则已校验：蹩马腿、塞象眼、" +
-                    "炮须隔子吃、九宫与过河限制、将帅照面；将军与将死判定开发中。",
+                text = "点选棋子，再点高亮处落子。规则已校验：蹩马腿、塞象眼、" +
+                    "炮须隔子吃、九宫与过河限制、将帅照面；不能送将，被将军时必须应将。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

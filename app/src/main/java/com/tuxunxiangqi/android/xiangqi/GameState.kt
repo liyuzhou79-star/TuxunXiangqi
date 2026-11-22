@@ -38,12 +38,17 @@ data class Piece(val type: PieceType, val side: Side)
 
 data class Move(val from: Pos, val to: Pos, val captured: Piece?)
 
+/** Outcome of a finished game: [winner] plus a plain reason string
+ *  ("将死" checkmate / "困毙" stalemate — in xiangqi the side that
+ *  cannot move loses either way). */
+data class GameResult(val winner: Side, val reason: String)
+
 /**
- * Basic movement rules ("pseudo-legal"): piece geometry, blockers,
- * palace and river limits, and the flying-generals rule. What is
- * deliberately NOT here yet (next milestone, behind [Rules]):
- * check / checkmate / stalemate detection and rejecting moves that
- * leave the own general in check.
+ * Movement rules. [isPseudoLegal] covers piece geometry, blockers,
+ * palace and river limits, and the flying-generals rule.
+ * [isLegal] additionally rejects moves that capture a general and
+ * moves that leave the own general in check （送将）, which is also
+ * what makes the generals-facing position unreachable in real play.
  */
 object Rules {
 
@@ -145,12 +150,67 @@ object Rules {
         }
     }
 
+    fun generalPos(cells: List<Piece?>, side: Side): Pos? {
+        for (r in 0..9) {
+            for (c in 0..8) {
+                val p = at(cells, Pos(c, r))
+                if (p != null && p.type == PieceType.GENERAL && p.side == side) {
+                    return Pos(c, r)
+                }
+            }
+        }
+        return null
+    }
+
+    /** True when [side]'s general is attacked by any opposing piece
+     *  (the flying-generals rule counts as an attack along the file). */
+    fun isInCheck(cells: List<Piece?>, side: Side): Boolean {
+        val general = generalPos(cells, side) ?: return false
+        for (r in 0..9) {
+            for (c in 0..8) {
+                val from = Pos(c, r)
+                val p = at(cells, from) ?: continue
+                if (p.side == side) continue
+                if (isPseudoLegal(cells, from, general)) return true
+            }
+        }
+        return false
+    }
+
+    /** Fully legal: pseudo-legal, does not capture a general, and
+     *  does not leave the own general in check after the move. */
+    fun isLegal(cells: List<Piece?>, from: Pos, to: Pos): Boolean {
+        if (!isPseudoLegal(cells, from, to)) return false
+        val piece = at(cells, from) ?: return false
+        val target = at(cells, to)
+        if (target != null && target.type == PieceType.GENERAL) return false
+        val copy = cells.toMutableList()
+        copy[to.row * 9 + to.col] = piece
+        copy[from.row * 9 + from.col] = null
+        return !isInCheck(copy, piece.side)
+    }
+
     fun legalTargets(cells: List<Piece?>, from: Pos): List<Pos> {
         val out = ArrayList<Pos>()
         for (r in 0..9) {
             for (c in 0..8) {
                 val to = Pos(c, r)
-                if (isPseudoLegal(cells, from, to)) out.add(to)
+                if (isLegal(cells, from, to)) out.add(to)
+            }
+        }
+        return out
+    }
+
+    fun allLegalMoves(cells: List<Piece?>, side: Side): List<Move> {
+        val out = ArrayList<Move>()
+        for (r in 0..9) {
+            for (c in 0..8) {
+                val from = Pos(c, r)
+                val p = at(cells, from) ?: continue
+                if (p.side != side) continue
+                for (to in legalTargets(cells, from)) {
+                    out.add(Move(from, to, at(cells, to)))
+                }
             }
         }
         return out
@@ -164,9 +224,17 @@ class GameState {
         private set
     var lastMove: Move? by mutableStateOf(null)
         private set
+    /** True when the side to move is currently in check （将军）. */
+    var inCheck: Boolean by mutableStateOf(false)
+        private set
+    /** Non-null once the game has ended (checkmate or stalemate). */
+    var result: GameResult? by mutableStateOf(null)
+        private set
     val moveCount: Int
         get() = history.size
     private val history = ArrayList<Move>()
+
+    fun historyMoves(): List<Move> = history.toList()
 
     init {
         reset()
@@ -201,19 +269,46 @@ class GameState {
         turn = Side.RED
         lastMove = null
         history.clear()
+        inCheck = false
+        result = null
     }
 
-    /** Applies the move when it passes the basic rules. Returns success. */
+    /** Loads an arbitrary position (used by tests and saved games). */
+    fun loadPosition(newCells: List<Piece?>, sideToMove: Side) {
+        require(newCells.size == 90)
+        cells.clear()
+        cells.addAll(newCells)
+        turn = sideToMove
+        lastMove = null
+        history.clear()
+        refreshStatus()
+    }
+
+    /** Recomputes check / game-over for the side to move. A side with
+     *  no legal move loses: by checkmate when in check, else by
+     *  stalemate （困毙）, per xiangqi rules. */
+    private fun refreshStatus() {
+        inCheck = Rules.isInCheck(cells, turn)
+        result = if (Rules.allLegalMoves(cells, turn).isEmpty()) {
+            GameResult(turn.other(), if (inCheck) "将死" else "困毙")
+        } else {
+            null
+        }
+    }
+
+    /** Applies the move when it is fully legal. Returns success. */
     fun tryMove(from: Pos, to: Pos): Boolean {
+        if (result != null) return false
         val piece = pieceAt(from) ?: return false
         if (piece.side != turn) return false
-        if (!Rules.isPseudoLegal(cells, from, to)) return false
+        if (!Rules.isLegal(cells, from, to)) return false
         val move = Move(from, to, pieceAt(to))
         set(to, piece)
         set(from, null)
         history.add(move)
         lastMove = move
         turn = turn.other()
+        refreshStatus()
         return true
     }
 
@@ -224,6 +319,8 @@ class GameState {
         set(move.to, move.captured)
         turn = turn.other()
         lastMove = history.lastOrNull()
+        result = null
+        inCheck = Rules.isInCheck(cells, turn)
         return true
     }
 }
