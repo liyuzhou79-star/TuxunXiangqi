@@ -262,11 +262,22 @@ fun GuessScreen(onBack: () -> Unit) {
         )
         if (notice != null) {
             Spacer(Modifier.height(6.dp))
-            Text(
-                text = notice!!,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
-            )
+            // Informational notices (empty wrong book, short
+            // records) are not errors — show them as a neutral
+            // card, not red text.
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = notice!!,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
         }
         Spacer(Modifier.height(10.dp))
         Text(

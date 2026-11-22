@@ -171,7 +171,7 @@ fun HomeScreen(
         Spacer(Modifier.height(14.dp))
         EntryCard(
             title = "残局题",
-            subtitle = "十六道红先胜残局，引擎当裁判，还有每日一题",
+            subtitle = "共 " + Puzzles.all.size + " 道红先胜残局，引擎当裁判，还有每日一题",
             icon = Icons.Filled.Favorite,
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -297,7 +297,17 @@ private fun EngineInfoCard() {
             InfoLine("引擎", "Pikafish 2026-09-06 · 官方 NNUE 网络")
             InfoLine("运行方式", "完全离线，全部计算在手机本地完成")
             InfoLine("许可", "GPL-3.0 开源 · 无广告 · 不联网")
-            InfoLine("版本", "0.7.0")
+            // Read the real version from the package instead of a
+            // hardcoded string (a hardcoded one went stale before).
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val versionName = androidx.compose.runtime.remember {
+                try {
+                    ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?"
+                } catch (_: Exception) {
+                    "?"
+                }
+            }
+            InfoLine("版本", versionName)
         }
     }
 }

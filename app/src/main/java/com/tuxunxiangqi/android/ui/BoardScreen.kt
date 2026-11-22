@@ -533,6 +533,22 @@ fun BoardScreen(
                 }
             } else if (focusMode) {
                 Spacer(Modifier.height(8.dp))
+                // Focus mode hides the normal status/banner area, so
+                // show the result here too — otherwise a finished
+                // game just looks like a frozen board.
+                state.result?.let { res ->
+                    Text(
+                        text = (when (res.winner) {
+                            Side.RED -> "红方胜"
+                            Side.BLACK -> "黑方胜"
+                            null -> "和棋"
+                        }) + " · " + res.reason,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
                         onClick = { focusMode = false },
@@ -818,7 +834,7 @@ fun BoardScreen(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Text(
                             text = "形势与候选",
                             style = MaterialTheme.typography.titleMedium,
@@ -883,7 +899,7 @@ fun BoardScreen(
                                         hintMove = cand.from to cand.to
                                     }
                                 )
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(6.dp))
                             }
                         }
                         Spacer(Modifier.height(4.dp))
@@ -1019,7 +1035,9 @@ fun BoardScreen(
             onDismissRequest = { showTrendDialog = false },
             title = { Text("局内走势大图") },
             text = {
-                Column {
+                // Scrollable: chart + key-move list can exceed the
+                // dialog height on small screens.
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     EvalTrendChart(points = evalPoints, big = true)
                     Spacer(Modifier.height(10.dp))
                     val swings = keySwings(evalPoints)
@@ -1087,7 +1105,7 @@ private fun CandidateRow(cand: CandidateUi, chosen: Boolean, onClick: () -> Unit
         ),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row {
                 Text(
                     text = when (cand.rank) {

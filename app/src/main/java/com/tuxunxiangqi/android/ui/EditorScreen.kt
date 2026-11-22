@@ -170,23 +170,21 @@ fun EditorScreen(
                     label = { Text("橡皮擦") },
                     modifier = Modifier.padding(end = 6.dp)
                 )
-                FilterChip(
-                    selected = false,
+                // Clear / reset are actions, not selectable options:
+                // real buttons, not chips (M3 semantics audit).
+                OutlinedButton(
                     onClick = {
                         val cells = MutableList<Piece?>(90) { null }
                         syncFromCells(cells)
                     },
-                    label = { Text("清空") },
                     modifier = Modifier.padding(end = 6.dp)
-                )
-                FilterChip(
-                    selected = false,
+                ) { Text("清空") }
+                OutlinedButton(
                     onClick = {
                         state.reset()
                         version++
-                    },
-                    label = { Text("恢复初始局面") }
-                )
+                    }
+                ) { Text("恢复初始局面") }
             }
             Spacer(Modifier.height(12.dp))
             if (problem != null) {
