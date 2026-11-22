@@ -221,7 +221,7 @@ private fun EngineInfoCard() {
             InfoLine("引擎", "Pikafish 2026-09-06 · 官方 NNUE 网络")
             InfoLine("运行方式", "完全离线，全部计算在手机本地完成")
             InfoLine("许可", "GPL-3.0 开源 · 无广告 · 不联网")
-            InfoLine("版本", "0.3.0")
+            InfoLine("版本", "0.4.0")
         }
     }
 }
