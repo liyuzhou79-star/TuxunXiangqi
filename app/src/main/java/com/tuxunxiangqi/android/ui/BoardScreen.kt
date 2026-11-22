@@ -54,6 +54,7 @@ import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.Notation
+import com.tuxunxiangqi.android.xiangqi.OpeningBook
 import com.tuxunxiangqi.android.xiangqi.Piece
 import com.tuxunxiangqi.android.xiangqi.PieceType
 import com.tuxunxiangqi.android.xiangqi.Pos
@@ -818,6 +819,36 @@ fun BoardScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(6.dp))
+                        // Opening book: only for games from the
+                        // standard start; suggestions set the arrow.
+                        val bookMoves = remember(state.moveCount, state.initialCells) {
+                            val standard = Fen.toFen(GameState())
+                            if (Fen.toFen(state.initialCells, state.initialTurn) == standard) {
+                                OpeningBook.lookup(
+                                    state.historyMoves().map { Fen.toUci(it.from, it.to) }
+                                )
+                            } else {
+                                emptyList()
+                            }
+                        }
+                        if (bookMoves.isNotEmpty()) {
+                            Text(
+                                text = "开局库（定式走法，点一下在棋盘上标出来）：",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            for ((uci, name) in bookMoves) {
+                                TextButton(
+                                    onClick = {
+                                        hintMove = Fen.parseUciMove(uci)
+                                    }
+                                ) {
+                                    Text(name)
+                                }
+                            }
+                            Spacer(Modifier.height(6.dp))
+                        }
                         val best = candidates.firstOrNull()
                         if (best == null) {
                             Text(
