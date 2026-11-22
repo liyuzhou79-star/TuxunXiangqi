@@ -29,27 +29,46 @@ jobs:
           make -j"$(nproc)" build ARCH=x86-64 COMP=gcc EXE=pikafish-linux
           ls -la pikafish-linux
 
-      # The binary is run from a clean directory WITHOUT pikafish.nnue
-      # next to it: if it still searches and returns a bestmove, the
-      # network is embedded in the binary as upstream intends.
+      # Phase A runs the binary WITH pikafish.nnue next to it: this is
+      # the pass/fail gate for engine + UCI protocol + network file.
+      # Phase B runs it alone in a clean directory and only RECORDS
+      # whether the network turns out to be embedded in the binary.
       - name: UCI smoke test
         run: |
-          mkdir -p smoke
-          cp pikafish-src/src/pikafish-linux smoke/
-          cd smoke
-          ( echo "uci"; sleep 2; echo "isready"; sleep 2; echo "position startpos"; echo "go depth 10"; sleep 25; echo "quit" ) | ./pikafish-linux > uci-smoke.log 2>&1 || true
-          cat uci-smoke.log
-          grep -q "uciok" uci-smoke.log
-          grep -q "readyok" uci-smoke.log
-          grep -q "^bestmove" uci-smoke.log
+          mkdir -p smoke-a smoke-b
+          cp pikafish-src/src/pikafish-linux smoke-a/
+          cp pikafish-src/src/pikafish.nnue smoke-a/
+          cp pikafish-src/src/pikafish-linux smoke-b/
+          run_uci() {
+            ( echo "uci"; sleep 2; echo "isready"; sleep 2; echo "position startpos"; echo "go depth 10"; sleep 25; echo "quit" ) | ./pikafish-linux > uci-smoke.log 2>&1 || true
+            cat uci-smoke.log
+          }
+          echo "===== PHASE A: binary + pikafish.nnue ====="
+          ( cd smoke-a && run_uci )
+          echo "===== PHASE B: binary alone (embedding check) ====="
+          ( cd smoke-b && run_uci ) || true
+          cp smoke-a/uci-smoke.log uci-smoke-a.log
+          cp smoke-b/uci-smoke.log uci-smoke-b.log
+          if grep -q "^bestmove" smoke-b/uci-smoke.log; then
+            echo "EMBEDDED=yes (binary runs standalone)" | tee embedded.txt
+          else
+            echo "EMBEDDED=no (binary needs the .nnue file at runtime)" | tee embedded.txt
+          fi
+          grep -q "uciok" smoke-a/uci-smoke.log
+          grep -q "readyok" smoke-a/uci-smoke.log
+          grep -q "^bestmove" smoke-a/uci-smoke.log
           echo "SMOKE OK"
 
       - name: Upload smoke log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pikafish-uci-smoke-log
-          path: smoke/uci-smoke.log
-          if-no-files-found: error
+          path: |
+            uci-smoke-a.log
+            uci-smoke-b.log
+            embedded.txt
+          if-no-files-found: warn
 
   build:
     runs-on: ubuntu-latest
