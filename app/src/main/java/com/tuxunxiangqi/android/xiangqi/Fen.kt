@@ -49,6 +49,72 @@ object Fen {
         return sb.toString()
     }
 
+    private fun typeOf(ch: Char): PieceType? = when (ch.uppercaseChar()) {
+        'K' -> PieceType.GENERAL
+        'A' -> PieceType.ADVISOR
+        'B' -> PieceType.ELEPHANT
+        'N' -> PieceType.HORSE
+        'R' -> PieceType.CHARIOT
+        'C' -> PieceType.CANNON
+        'P' -> PieceType.SOLDIER
+        else -> null
+    }
+
+    /** Parses a FEN string back into cells + side to move, or null
+     *  when the board part is malformed. */
+    fun fromFen(fen: String): Pair<List<Piece?>, Side>? {
+        val fields = fen.trim().split(Regex("\\s+"))
+        if (fields.isEmpty()) return null
+        val rows = fields[0].split('/')
+        if (rows.size != 10) return null
+        val cells = MutableList<Piece?>(90) { null }
+        for (r in 0..9) {
+            var c = 0
+            for (ch in rows[r]) {
+                when {
+                    ch.isDigit() -> c += ch - '0'
+                    else -> {
+                        val type = typeOf(ch) ?: return null
+                        if (c !in 0..8) return null
+                        val side = if (ch.isUpperCase()) Side.RED else Side.BLACK
+                        cells[r * 9 + c] = Piece(type, side)
+                        c++
+                    }
+                }
+            }
+            if (c != 9) return null
+        }
+        val side = if (fields.getOrNull(1) == "b") Side.BLACK else Side.RED
+        return cells to side
+    }
+
+    /** FEN of an arbitrary cell layout (records, editor starts). */
+    fun toFen(cells: List<Piece?>, turn: Side, fullmove: Int = 1): String {
+        val sb = StringBuilder()
+        for (r in 0..9) {
+            var empty = 0
+            for (c in 0..8) {
+                val piece = cells[r * 9 + c]
+                if (piece == null) {
+                    empty++
+                } else {
+                    if (empty > 0) {
+                        sb.append(empty)
+                        empty = 0
+                    }
+                    val ch = letter(piece.type)
+                    sb.append(if (piece.side == Side.RED) ch else ch.lowercaseChar())
+                }
+            }
+            if (empty > 0) sb.append(empty)
+            if (r < 9) sb.append('/')
+        }
+        sb.append(if (turn == Side.RED) " w" else " b")
+        sb.append(" - - 0 ")
+        sb.append(fullmove.coerceAtLeast(1))
+        return sb.toString()
+    }
+
     fun toUci(from: Pos, to: Pos): String {
         fun sq(p: Pos) = "${'a' + p.col}${9 - p.row}"
         return sq(from) + sq(to)

@@ -31,6 +31,22 @@ class FenTest {
     }
 
     @Test
+    fun fenRoundTrip() {
+        val s = GameState()
+        val fen = Fen.toFen(s)
+        val parsed = Fen.fromFen(fen)!!
+        assertEquals(s.cells.toList(), parsed.first)
+        assertEquals(com.tuxunxiangqi.android.xiangqi.Side.RED, parsed.second)
+        assertEquals(fen, Fen.toFen(parsed.first, parsed.second))
+    }
+
+    @Test
+    fun fromFenRejectsGarbage() {
+        assertNull(Fen.fromFen("not a fen"))
+        assertNull(Fen.fromFen("9/9 w"))
+    }
+
+    @Test
     fun uciRoundTrip() {
         // The CI smoke test's bestmove from startpos: b2e2.
         val (from, to) = Fen.parseUciMove("b2e2")!!
