@@ -142,7 +142,7 @@ fun HomeScreen(
         Spacer(Modifier.height(14.dp))
         EntryCard(
             title = "残局题",
-            subtitle = "十道红先胜残局，引擎当裁判，还有每日一题",
+            subtitle = "十六道红先胜残局，引擎当裁判，还有每日一题",
             icon = Icons.Filled.Favorite,
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
