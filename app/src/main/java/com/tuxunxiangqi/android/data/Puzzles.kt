@@ -144,6 +144,10 @@ class WrongBookStore(context: Context) {
         writeAll(loadAll().filter { it.fen != fen })
     }
 
+    fun replaceAll(entries: List<WrongEntry>) {
+        writeAll(entries)
+    }
+
     private fun writeAll(entries: List<WrongEntry>) {
         val arr = JSONArray()
         for (e in entries) {

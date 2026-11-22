@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tuxunxiangqi.android.data.GameRecord
+import com.tuxunxiangqi.android.data.SettingsStore
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.engine.Candidate
 import com.tuxunxiangqi.android.engine.PikafishEngine
@@ -147,12 +148,21 @@ fun BoardScreen(
     // Setup.
     var setupDone by remember { mutableStateOf(mode == BoardMode.PVP) }
     var humanSide by remember { mutableStateOf(Side.RED) }
-    var level by remember { mutableStateOf(Level.NORMAL) }
+    val settingsStore = remember { SettingsStore(context) }
+    var level by remember {
+        mutableStateOf(
+            when (settingsStore.defaultLevelLabel) {
+                "休闲" -> Level.CASUAL
+                "高手" -> Level.EXPERT
+                else -> Level.NORMAL
+            }
+        )
+    }
     var handicap by remember { mutableStateOf(Handicap.NONE) }
     var specSpeed by remember { mutableStateOf(SpecSpeed.MID) }
     var spectaclePaused by remember { mutableStateOf(false) }
     // Clock.
-    var clockMinutes by remember { mutableStateOf(0) }
+    var clockMinutes by remember { mutableStateOf(settingsStore.defaultClockMinutes) }
     var redMs by remember { mutableStateOf(0L) }
     var blackMs by remember { mutableStateOf(0L) }
     var clockPaused by remember { mutableStateOf(false) }
@@ -168,7 +178,7 @@ fun BoardScreen(
     var selectedRank by remember { mutableStateOf(1) }
     var hintMove by remember { mutableStateOf<Pair<Pos, Pos>?>(null) }
     var autoAnalyze by remember { mutableStateOf(false) }
-    var analysisMs by remember { mutableStateOf(1000f) }
+    var analysisMs by remember { mutableStateOf(settingsStore.defaultAnalysisMs.toFloat()) }
     var evalPoints by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     var lastRedCp by remember { mutableStateOf<Int?>(null) }
     var showTrendDialog by remember { mutableStateOf(false) }
@@ -215,6 +225,7 @@ fun BoardScreen(
         }
         val modeLabel = when (mode) {
             BoardMode.AI -> "人机对弈 · " + level.label +
+                " · " + (if (humanSide == Side.RED) "执红" else "执黑") +
                 (if (handicap != Handicap.NONE) " · " + handicap.label else "")
             BoardMode.PVP -> "人人对弈"
             BoardMode.SPECTACLE -> "AI 表演赛"
