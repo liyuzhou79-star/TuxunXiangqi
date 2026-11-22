@@ -16,7 +16,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
@@ -44,7 +46,10 @@ fun HomeScreen(
     onVsFriend: () -> Unit,
     onRecords: () -> Unit,
     onEditor: () -> Unit = {},
-    onSpectacle: () -> Unit = {}
+    onSpectacle: () -> Unit = {},
+    onGuess: () -> Unit = {},
+    onPuzzles: () -> Unit = {},
+    onGuide: () -> Unit = {}
 ) {
     // One scrollable container for the whole page (scroll audit:
     // every page must stay reachable on short screens).
@@ -121,6 +126,36 @@ fun HomeScreen(
             contentColor = MaterialTheme.colorScheme.onSurface,
             iconTint = MaterialTheme.colorScheme.primary,
             onClick = onSpectacle
+        )
+        Spacer(Modifier.height(14.dp))
+        EntryCard(
+            title = "猜一选",
+            subtitle = "看局面猜引擎的第一选择，猜错进错题本",
+            icon = Icons.Filled.Star,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onGuess
+        )
+        Spacer(Modifier.height(14.dp))
+        EntryCard(
+            title = "残局题",
+            subtitle = "十道红先胜残局，引擎当裁判，还有每日一题",
+            icon = Icons.Filled.Favorite,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onPuzzles
+        )
+        Spacer(Modifier.height(14.dp))
+        EntryCard(
+            title = "新手指南",
+            subtitle = "每种棋子怎么走，小棋盘图一步看懂",
+            icon = Icons.Filled.Create,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onGuide
         )
         Spacer(Modifier.height(14.dp))
         EntryCard(

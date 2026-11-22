@@ -18,6 +18,9 @@ import com.tuxunxiangqi.android.ui.HomeScreen
 import com.tuxunxiangqi.android.ui.JiangTheme
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.ui.RecordsScreen
+import com.tuxunxiangqi.android.ui.GuessScreen
+import com.tuxunxiangqi.android.ui.GuideScreen
+import com.tuxunxiangqi.android.ui.PuzzleScreen
 import com.tuxunxiangqi.android.ui.ReviewScreen
 
 private sealed interface Screen {
@@ -27,6 +30,9 @@ private sealed interface Screen {
         val startCells: List<com.tuxunxiangqi.android.xiangqi.Piece?>? = null
     ) : Screen
     data object Records : Screen
+    data object Guess : Screen
+    data object Puzzles : Screen
+    data object Guide : Screen
     data class Review(val record: GameRecord) : Screen
     data object Editor : Screen
 }
@@ -50,7 +56,10 @@ class MainActivity : ComponentActivity() {
                             onVsFriend = { screen = Screen.Board(BoardMode.PVP) },
                             onRecords = { screen = Screen.Records },
                             onEditor = { screen = Screen.Editor },
-                            onSpectacle = { screen = Screen.Board(BoardMode.SPECTACLE) }
+                            onSpectacle = { screen = Screen.Board(BoardMode.SPECTACLE) },
+                            onGuess = { screen = Screen.Guess },
+                            onPuzzles = { screen = Screen.Puzzles },
+                            onGuide = { screen = Screen.Guide }
                         )
                         is Screen.Board -> BoardScreen(
                             mode = s.mode,
@@ -60,6 +69,15 @@ class MainActivity : ComponentActivity() {
                         Screen.Records -> RecordsScreen(
                             onBack = { screen = Screen.Home },
                             onOpenReview = { record -> screen = Screen.Review(record) }
+                        )
+                        Screen.Guess -> GuessScreen(
+                            onBack = { screen = Screen.Home }
+                        )
+                        Screen.Puzzles -> PuzzleScreen(
+                            onBack = { screen = Screen.Home }
+                        )
+                        Screen.Guide -> GuideScreen(
+                            onBack = { screen = Screen.Home }
                         )
                         is Screen.Review -> ReviewScreen(
                             record = s.record,
