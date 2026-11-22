@@ -14,15 +14,17 @@ class NotationTest {
     @Test
     fun startposCannonIsPaoErPingWu() {
         val s = GameState()
-        // Red cannon from (1,7) to (4,7): the famous 炮二平五.
-        assertEquals("炮二平五", Notation.moveText(s.cells, Pos(1, 7), Pos(4, 7)))
+        // Red cannon from (7,7) to (4,7): the famous 炮二平五.
+        assertEquals("炮二平五", Notation.moveText(s.cells, Pos(7, 7), Pos(4, 7)))
+        // The mirror cannon is 炮八平五.
+        assertEquals("炮八平五", Notation.moveText(s.cells, Pos(1, 7), Pos(4, 7)))
     }
 
     @Test
     fun blackHorseUsesArabicNumerals() {
         val s = GameState()
-        // Black horse from (1,0) to (2,2): 马8进7.
-        assertEquals("马8进7", Notation.moveText(s.cells, Pos(1, 0), Pos(2, 2)))
+        // Black horse from (7,0) to (6,2): 马8进7.
+        assertEquals("马8进7", Notation.moveText(s.cells, Pos(7, 0), Pos(6, 2)))
     }
 
     @Test
@@ -41,7 +43,7 @@ class NotationTest {
     @Test
     fun pvFormatsSequence() {
         val s = GameState()
-        val pv = Notation.pvText(s.cells, listOf("b2e2", "b9c7"), maxMoves = 2)
+        val pv = Notation.pvText(s.cells, listOf("h2e2", "h9g7"), maxMoves = 2)
         assertEquals(listOf("炮二平五", "马8进7"), pv)
     }
 

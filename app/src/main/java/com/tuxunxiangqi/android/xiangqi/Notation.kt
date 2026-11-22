@@ -13,12 +13,15 @@ object Notation {
 
     private val cn = listOf("", "一", "二", "三", "四", "五", "六", "七", "八", "九")
 
-    /** File number 1..9 of [col]. On the printed diagram both
-     *  sides count from their own right hand, which works out to
-     *  9 - col for both (check the standard opening: 红炮二 is the
-     *  cannon on col 7, 黑马8 the horse on col 1, 黑车9 the chariot
-     *  on col 0). Only the numeral style differs by side. */
-    private fun fileOf(side: Side, col: Int): Int = 9 - col
+    /** File number 1..9 of [col], counted from the moving side's
+     *  own right hand: Red (sitting at the bottom, col 0 on the
+     *  left of the diagram) counts 9 - col, Black counts col + 1.
+     *  Check the standard opening: 红炮二平五 is the cannon on
+     *  col 7 moving to col 4; 黑马8进7 is the horse on col 7 moving
+     *  to col 6; 黑车9平8 is the chariot on col 8 moving to col 7.
+     *  (The engine smoke test's b2e2 is the mirror move 炮八平五.) */
+    private fun fileOf(side: Side, col: Int): Int =
+        if (side == Side.RED) 9 - col else col + 1
 
     private fun fileText(side: Side, col: Int): String {
         val f = fileOf(side, col)

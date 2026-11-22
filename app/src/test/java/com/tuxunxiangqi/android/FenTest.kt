@@ -22,7 +22,7 @@ class FenTest {
     @Test
     fun fenAfterFirstMove() {
         val s = GameState()
-        // 炮二平五: red cannon (1,7) -> (4,7).
+        // 炮八平五: red cannon (1,7) -> (4,7) (mirror of 炮二平五).
         assertTrue(s.tryMove(Pos(1, 7), Pos(4, 7)))
         assertEquals(
             "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/4C2C1/9/RNBAKABNR b - - 0 1",
