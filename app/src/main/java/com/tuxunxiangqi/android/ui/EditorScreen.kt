@@ -94,11 +94,24 @@ fun validatePosition(cells: List<Piece?>): String? {
 @Composable
 fun EditorScreen(
     onBack: () -> Unit,
-    onStart: (List<Piece?>, BoardMode) -> Unit
+    onStart: (List<Piece?>, BoardMode) -> Unit,
+    initialFen: String? = null
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val state = remember { GameState() }
+    // An initial FEN can be handed in (1.27.0: the records page
+    // import box recognises a bare FEN and routes it here); the
+    // editor still normalises to Red to move, as its FEN card
+    // explains. An unparseable hand-in simply starts standard.
+    val state = remember {
+        val gs = GameState()
+        if (initialFen != null) {
+            Fen.fromFen(initialFen)?.let { (cells, _) ->
+                gs.loadPosition(cells, Side.RED)
+            }
+        }
+        gs
+    }
     // null tool = eraser.
     var tool by remember { mutableStateOf<Piece?>(Piece(PieceType.CHARIOT, Side.RED)) }
     var erase by remember { mutableStateOf(false) }

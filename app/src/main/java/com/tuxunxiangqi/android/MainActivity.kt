@@ -46,7 +46,7 @@ private sealed interface Screen {
     data object Openings : Screen
     data object Guide : Screen
     data class Review(val record: GameRecord) : Screen
-    data object Editor : Screen
+    data class Editor(val initialFen: String? = null) : Screen
     data object Settings : Screen
     data object Stats : Screen
 }
@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
                             onVsAi = { screen = Screen.Board(BoardMode.AI) },
                             onVsFriend = { screen = Screen.Board(BoardMode.PVP) },
                             onRecords = { screen = Screen.Records },
-                            onEditor = { screen = Screen.Editor },
+                            onEditor = { screen = Screen.Editor() },
                             onSpectacle = { screen = Screen.Board(BoardMode.SPECTACLE) },
                             onGuess = { screen = Screen.Guess },
                             onPuzzles = { screen = Screen.Puzzles },
@@ -120,7 +120,8 @@ class MainActivity : ComponentActivity() {
                         )
                         Screen.Records -> RecordsScreen(
                             onBack = { screen = Screen.Home },
-                            onOpenReview = { record -> screen = Screen.Review(record) }
+                            onOpenReview = { record -> screen = Screen.Review(record) },
+                            onOpenFenInEditor = { fen -> screen = Screen.Editor(fen) }
                         )
                         Screen.Guess -> GuessScreen(
                             onBack = { screen = Screen.Home }
@@ -174,8 +175,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         )
-                        Screen.Editor -> com.tuxunxiangqi.android.ui.EditorScreen(
+                        is Screen.Editor -> com.tuxunxiangqi.android.ui.EditorScreen(
                             onBack = { screen = Screen.Home },
+                            initialFen = s.initialFen,
                             onStart = { cells, m ->
                                 screen = Screen.Board(m, cells)
                             }

@@ -1,6 +1,7 @@
 package com.tuxunxiangqi.android.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
@@ -9,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
 /**
@@ -22,16 +24,28 @@ fun EvalTrendChart(
     points: List<Pair<Int, Int>>,
     modifier: Modifier = Modifier,
     big: Boolean = false,
-    highlightMove: Int? = null
+    highlightMove: Int? = null,
+    onSelectMove: ((Int) -> Unit)? = null
 ) {
     val lineColor = MaterialTheme.colorScheme.primary
     val keyColor = MaterialTheme.colorScheme.error
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     val highlightColor = MaterialTheme.colorScheme.tertiary
+    val tapModifier = if (onSelectMove != null && points.size >= 2) {
+        Modifier.pointerInput(points, onSelectMove) {
+            detectTapGestures { offset ->
+                nearestTrendMove(points, offset.x / size.width)
+                    ?.let { onSelectMove(it) }
+            }
+        }
+    } else {
+        Modifier
+    }
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(if (big) 180.dp else 64.dp)
+            .then(tapModifier)
     ) {
         if (points.size < 2) {
             // Zero axis only; the card text explains the state.
@@ -91,6 +105,18 @@ fun EvalTrendChart(
             }
         }
     }
+}
+
+/** The evaluated move nearest to a horizontal tap position on
+ *  the chart (fraction = tap x / chart width, clamped to 0..1).
+ *  Uses the same x mapping as the drawing code — move index over
+ *  max(last move, 10) — so the tapped point is the one the finger
+ *  is actually on. Pure, so the mapping is pinned by unit tests. */
+fun nearestTrendMove(points: List<Pair<Int, Int>>, fraction: Float): Int? {
+    if (points.isEmpty()) return null
+    val maxMove = maxOf(points.maxOf { it.first }, 10)
+    val target = fraction.coerceIn(0f, 1f) * maxMove
+    return points.minByOrNull { kotlin.math.abs(it.first - target) }?.first
 }
 
 /** Move numbers (1-based move counts) where the evaluation swung

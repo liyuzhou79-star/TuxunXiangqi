@@ -387,6 +387,10 @@ fun ReviewScreen(
                     Toast.makeText(context, "局面图生成失败，请再试一次", Toast.LENGTH_SHORT).show()
                 }
             }) { Text("分享棋盘图") }
+            OutlinedButton(onClick = {
+                clipboard.setText(AnnotatedString(Fen.toFen(displayState)))
+                Toast.makeText(context, "当前局面 FEN 已复制", Toast.LENGTH_SHORT).show()
+            }) { Text("复制当前局面 FEN") }
         }
         // An unfinished game can be picked up and played on
         // from its final position (1.24.0), under the setup it
@@ -834,11 +838,18 @@ fun ReviewScreen(
                     EvalTrendChart(
                         points = trendPoints,
                         modifier = Modifier.fillMaxWidth().height(72.dp),
-                        highlightMove = idx
+                        highlightMove = idx,
+                        onSelectMove = { move ->
+                            playing = false
+                            idx = move.coerceAtMost(maxIdx)
+                            scope.launch {
+                                pageScroll.animateScrollTo(0)
+                            }
+                        }
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "图上的圈是你现在看的这一步，拖动上面的滑杆或步进，圈会跟着走。",
+                        text = "点走势图任意位置，直接跳到最近的那一步；图上的圈是你现在看的这一步，拖动上面的滑杆或步进，圈会跟着走。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

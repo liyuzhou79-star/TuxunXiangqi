@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.data.filterRecords
@@ -65,7 +66,8 @@ import java.util.Locale
 @Composable
 fun RecordsScreen(
     onBack: () -> Unit,
-    onOpenReview: (GameRecord) -> Unit
+    onOpenReview: (GameRecord) -> Unit,
+    onOpenFenInEditor: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -495,6 +497,25 @@ fun RecordsScreen(
                         minLines = 4,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    // A bare FEN is not a game record — but rather
+                    // than just failing, offer to open it in the
+                    // position editor (1.27.0).
+                    val trimmedImport = importText.trim()
+                    if (trimmedImport.isNotEmpty() &&
+                        parsePortableRecords(trimmedImport, 0L).isEmpty() &&
+                        Fen.fromFen(trimmedImport) != null
+                    ) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "这看起来是一段 FEN 局面（不是棋谱）。",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        TextButton(onClick = {
+                            importOpen = false
+                            importText = ""
+                            onOpenFenInEditor(trimmedImport)
+                        }) { Text("去摆棋页打开这个局面") }
+                    }
                 }
             },
             confirmButton = {
