@@ -32,6 +32,14 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("soundOn", true)
         set(value) = prefs.edit().putBoolean("soundOn", value).apply()
 
+    /** Fine strength tuning for the AI game, 1..10 (default 5).
+     *  Pikafish has no native strength option (verified against
+     *  its full UCI option list), so this is simulated with
+     *  thinking time and a search-depth cap — see BoardScreen. */
+    var strengthLevel: Int
+        get() = prefs.getInt("strengthLevel", 5).coerceIn(1, 10)
+        set(value) = prefs.edit().putInt("strengthLevel", value.coerceIn(1, 10)).apply()
+
     /** Safety colours on the selected piece's legal targets:
      *  green = the piece survives there, red = it would be taken
      *  （送死）, green ring = a capture that cannot be answered,
@@ -49,6 +57,7 @@ class SettingsStore(context: Context) {
         o.put("analysisMs", defaultAnalysisMs)
         o.put("soundOn", soundOn)
         o.put("safetyHintsOn", safetyHintsOn)
+        o.put("strengthLevel", strengthLevel)
         return o
     }
 
@@ -61,6 +70,7 @@ class SettingsStore(context: Context) {
         // Older backups have no safetyHintsOn key: keep the
         // current value then (optBoolean falls back to it).
         safetyHintsOn = o.optBoolean("safetyHintsOn", safetyHintsOn)
+        strengthLevel = o.optInt("strengthLevel", strengthLevel)
     }
 }
 

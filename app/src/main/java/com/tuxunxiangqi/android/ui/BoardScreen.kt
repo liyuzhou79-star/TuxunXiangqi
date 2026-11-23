@@ -70,6 +70,7 @@ import com.tuxunxiangqi.android.xiangqi.Pos
 import com.tuxunxiangqi.android.xiangqi.Rules
 import com.tuxunxiangqi.android.xiangqi.Side
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 enum class BoardMode { AI, PVP, SPECTACLE }
 
@@ -78,6 +79,24 @@ private enum class Level(val label: String, val hint: String, val movetimeMs: In
     NORMAL("普通", "每步约 1 秒，棋力已经很强", 1000, null),
     EXPERT("高手", "每步约 3 秒，全力思考", 3000, null)
 }
+
+/** Fine strength tuning (1..10) on top of the coarse [Level]
+ *  tiers. Pikafish exposes no native strength option — its full
+ *  UCI option list was checked (Threads / Hash / MultiPV / Move
+ *  Overhead / nodestime / UCI_ShowWDL / EvalFile and the like;
+ *  no UCI_LimitStrength, no UCI_Elo, no Skill Level) — so the
+ *  tuning is simulated by scaling the thinking time and capping
+ *  the search depth, and the setup UI says so plainly. */
+private val STRENGTH_TIME_FACTOR =
+    listOf(0.30f, 0.45f, 0.60f, 0.80f, 1.00f, 1.25f, 1.55f, 1.90f, 2.30f, 2.80f)
+private val STRENGTH_DEPTH_CAP: List<Int?> =
+    listOf(5, 7, 9, 11, 14, 17, 20, 24, 28, null)
+
+private fun effectiveMovetimeMs(level: Level, strength: Int): Int =
+    (level.movetimeMs * STRENGTH_TIME_FACTOR[strength - 1]).toInt().coerceAtLeast(80)
+
+private fun effectiveDepthCap(level: Level, strength: Int): Int? =
+    listOfNotNull(level.depthCap, STRENGTH_DEPTH_CAP[strength - 1]).minOrNull()
 
 private enum class Handicap(val label: String) {
     NONE("不让子"), ONE_HORSE("让一马"), TWO_HORSES("让双马"),
@@ -269,6 +288,7 @@ fun BoardScreen(
             }
         )
     }
+    var strength by remember { mutableStateOf(settingsStore.strengthLevel) }
     var handicap by remember { mutableStateOf(Handicap.NONE) }
     var specSpeed by remember { mutableStateOf(SpecSpeed.MID) }
     var spectaclePaused by remember { mutableStateOf(false) }
@@ -432,9 +452,9 @@ fun BoardScreen(
         val engineSide = state.turn
         val movetime = when (mode) {
             BoardMode.SPECTACLE -> specSpeed.movetimeMs
-            else -> level.movetimeMs
+            else -> effectiveMovetimeMs(level, strength)
         }
-        val cap = if (mode == BoardMode.AI) level.depthCap else null
+        val cap = if (mode == BoardMode.AI) effectiveDepthCap(level, strength) else null
         engine.compute(fen, movetime, cap) { res, err ->
             thinking = false
             when {
@@ -658,6 +678,11 @@ fun BoardScreen(
                         },
                         level = level,
                         onLevelChange = { level = it },
+                        strength = strength,
+                        onStrengthChange = {
+                            strength = it
+                            settingsStore.strengthLevel = it
+                        },
                         handicap = handicap,
                         onHandicapChange = { handicap = it },
                         clockMinutes = clockMinutes,
@@ -1306,6 +1331,8 @@ private fun SetupAiSection(
     onSideChange: (Side) -> Unit,
     level: Level,
     onLevelChange: (Level) -> Unit,
+    strength: Int,
+    onStrengthChange: (Int) -> Unit,
     handicap: Handicap,
     onHandicapChange: (Handicap) -> Unit,
     clockMinutes: Int,
@@ -1344,6 +1371,33 @@ private fun SetupAiSection(
         Text(
             text = level.hint,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(20.dp))
+        Text(text = "棋力细调", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        run {
+            val ms = effectiveMovetimeMs(level, strength)
+            val cap = effectiveDepthCap(level, strength)
+            Text(
+                text = "当前细调 $strength / 10：引擎每步约想 " +
+                    (if (ms >= 1000) "${"%.1f".format(ms / 1000f)} 秒" else "$ms 毫秒") +
+                    (if (cap != null) "，最深算 $cap 层" else "，深度不限"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Slider(
+            value = strength.toFloat(),
+            onValueChange = { onStrengthChange(it.roundToInt().coerceIn(1, 10)) },
+            valueRange = 1f..10f,
+            steps = 8
+        )
+        Text(
+            text = "说明白：Pikafish 引擎本身没有强弱档（它的全部设置项都实测核对过），" +
+                "这个细调是拿思考时间和搜索深度模拟出来的——数字越小它想得越少、越像新手；" +
+                "数字越大想得越久越深。三档管底子，这个管细微差别。",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (!customStart) {
