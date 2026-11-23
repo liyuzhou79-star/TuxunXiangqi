@@ -36,7 +36,8 @@ private sealed interface Screen {
         val mode: BoardMode,
         val startCells: List<com.tuxunxiangqi.android.xiangqi.Piece?>? = null,
         val resume: com.tuxunxiangqi.android.data.ResumeGame? = null,
-        val startTurnRed: Boolean = true
+        val startTurnRed: Boolean = true,
+        val bookPrefixUci: List<String> = emptyList()
     ) : Screen
     data object Records : Screen
     data object Guess : Screen
@@ -107,6 +108,7 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 com.tuxunxiangqi.android.xiangqi.Side.BLACK
                             },
+                            bookPrefix = s.bookPrefixUci,
                             resume = s.resume,
                             onReviewRecord = { id ->
                                 val rec = com.tuxunxiangqi.android.data.RecordStore(
@@ -127,11 +129,12 @@ class MainActivity : ComponentActivity() {
                         )
                         Screen.Openings -> com.tuxunxiangqi.android.ui.OpeningScreen(
                             onBack = { screen = Screen.Home },
-                            onStartGame = { cells, redTurn, m ->
+                            onStartGame = { cells, redTurn, m, history ->
                                 screen = Screen.Board(
                                     mode = m,
                                     startCells = cells,
-                                    startTurnRed = redTurn
+                                    startTurnRed = redTurn,
+                                    bookPrefixUci = history
                                 )
                             }
                         )

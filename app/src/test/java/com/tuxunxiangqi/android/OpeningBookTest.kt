@@ -97,6 +97,27 @@ class OpeningBookTest {
         }
     }
 
+    /** Prefix continuation (1.18.0): a game started from a book
+     *  node keeps quoting the book when the lookup history is
+     *  prefix + in-game moves along a written line. */
+    @Test
+    fun lookupContinuesFromNodePrefix() {
+        // 中炮对马 node, then 马二进三 lands on a deeper node.
+        val deeper = OpeningBook.lookup(
+            listOf("h2e2", "h9g7", "h0g2")
+        )
+        assertTrue(deeper.isNotEmpty())
+        // Further along the same written line stays in book.
+        val further = OpeningBook.lookup(
+            listOf("h2e2", "h9g7", "h0g2", "a9a8", "b0c2")
+        )
+        assertTrue(further.isNotEmpty())
+        // Leaving the written lines leaves the book.
+        assertTrue(
+            OpeningBook.lookup(listOf("h2e2", "h9g7", "a0a1")).isEmpty()
+        )
+    }
+
     /** Blank query is the whole book; nonsense finds nothing. */
     @Test
     fun searchBlankAndNonsense() {

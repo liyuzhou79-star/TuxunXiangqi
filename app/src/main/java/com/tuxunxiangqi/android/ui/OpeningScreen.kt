@@ -42,9 +42,11 @@ import kotlinx.coroutines.launch
 fun OpeningScreen(
     onBack: () -> Unit,
     /** Start a real game from the previewed position (1.16.0):
-     *  cells, whether Red is to move, and the game mode. */
-    onStartGame: (List<com.tuxunxiangqi.android.xiangqi.Piece?>, Boolean, BoardMode) -> Unit =
-        { _, _, _ -> }
+     *  cells, whether Red is to move, the game mode, and the
+     *  book history that led here (1.18.0: so the game screen
+     *  can keep quoting book lines from this point on). */
+    onStartGame: (List<com.tuxunxiangqi.android.xiangqi.Piece?>, Boolean, BoardMode, List<String>) -> Unit =
+        { _, _, _, _ -> }
 ) {
     var query by remember { mutableStateOf("") }
     val allNodes = remember { OpeningBook.allNodes() }
@@ -149,7 +151,8 @@ fun OpeningScreen(
                         preview.cells.toList(),
                         OpeningBook.turnAfter(selHistory) ==
                             com.tuxunxiangqi.android.xiangqi.Side.RED,
-                        BoardMode.AI
+                        BoardMode.AI,
+                        selHistory
                     )
                 }
             ) { Text("从这个局面人机对弈") }
@@ -159,7 +162,8 @@ fun OpeningScreen(
                         preview.cells.toList(),
                         OpeningBook.turnAfter(selHistory) ==
                             com.tuxunxiangqi.android.xiangqi.Side.RED,
-                        BoardMode.PVP
+                        BoardMode.PVP,
+                        selHistory
                     )
                 }
             ) { Text("从这个局面人人对弈") }

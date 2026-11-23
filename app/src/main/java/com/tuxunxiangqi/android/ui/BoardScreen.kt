@@ -268,6 +268,11 @@ fun BoardScreen(
     onBack: () -> Unit,
     startCells: List<Piece?>? = null,
     startTurn: Side = Side.RED,
+    /** Opening-book history that led to a custom start (set when
+     *  the game was started from the book browser, 1.18.0): the
+     *  analysis panel keeps quoting the book by looking up
+     *  prefix + in-game moves. */
+    bookPrefix: List<String> = emptyList(),
     onReviewRecord: (Long) -> Unit = {},
     resume: ResumeGame? = null
 ) {
@@ -1245,16 +1250,21 @@ fun BoardScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(6.dp))
-                        // Opening book: only for games from the
-                        // standard start; suggestions set the arrow.
-                        val bookMoves = remember(state.moveCount, state.initialCells) {
+                        // Opening book: for games from the
+                        // standard start, and for games started
+                        // from a book node (1.18.0, via the
+                        // history prefix); suggestions set the
+                        // arrow.
+                        val bookMoves = remember(state.moveCount, state.initialCells, bookPrefix) {
+                            val inGame = state.historyMoves()
+                                .map { Fen.toUci(it.from, it.to) }
                             val standard = Fen.toFen(GameState())
-                            if (Fen.toFen(state.initialCells, state.initialTurn) == standard) {
-                                OpeningBook.lookup(
-                                    state.historyMoves().map { Fen.toUci(it.from, it.to) }
-                                )
-                            } else {
-                                emptyList()
+                            when {
+                                bookPrefix.isNotEmpty() ->
+                                    OpeningBook.lookup(bookPrefix + inGame)
+                                Fen.toFen(state.initialCells, state.initialTurn) == standard ->
+                                    OpeningBook.lookup(inGame)
+                                else -> emptyList()
                             }
                         }
                         if (bookMoves.isNotEmpty()) {
