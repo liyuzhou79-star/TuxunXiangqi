@@ -118,6 +118,9 @@ fun buildBackupJson(context: Context): String {
         val marks = JSONObject()
         for ((k, v) in r.marks) marks.put(k.toString(), v)
         o.put("marks", marks)
+        val deep = JSONObject()
+        for ((k, v) in r.deep) deep.put(k.toString(), v)
+        o.put("deep", deep)
         recArr.put(o)
     }
     root.put("records", recArr)
@@ -168,6 +171,15 @@ fun applyBackupJson(context: Context, text: String): String? {
             val k = mKeys.next()
             marks[k.toInt()] = marksObj.getString(k)
         }
+        val deep = HashMap<Int, String>()
+        val deepObj = o.optJSONObject("deep") ?: JSONObject()
+        val dKeys = deepObj.keys()
+        while (dKeys.hasNext()) {
+            val k = dKeys.next()
+            val step = k.toIntOrNull()
+            val encoded = deepObj.optString(k, "")
+            if (step != null && encoded.isNotBlank()) deep[step] = encoded
+        }
         records.add(
             GameRecord(
                 id = o.optLong("id", System.currentTimeMillis() + i),
@@ -178,7 +190,8 @@ fun applyBackupJson(context: Context, text: String): String? {
                 initialFen = o.optString("fen", ""),
                 movesUci = moves,
                 evals = evals,
-                marks = marks
+                marks = marks,
+                deep = deep
             )
         )
     }

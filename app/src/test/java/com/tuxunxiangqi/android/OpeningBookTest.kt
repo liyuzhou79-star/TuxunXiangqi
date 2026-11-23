@@ -6,6 +6,7 @@ import com.tuxunxiangqi.android.xiangqi.Notation
 import com.tuxunxiangqi.android.xiangqi.OpeningBook
 import com.tuxunxiangqi.android.xiangqi.Rules
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -159,6 +160,37 @@ class OpeningBookTest {
                 assertEquals(
                     "name mismatch for $uci after '$history'",
                     printed, generated
+                )
+            }
+        }
+    }
+    @Test
+    fun lineNameFollowsTheNamedMovesOnThePath() {
+        // The last bracketed tag along the path names the line.
+        assertEquals("中炮", OpeningBook.lineName(listOf("h2e2")))
+        assertEquals("中炮", OpeningBook.lineName(listOf("b2e2")))
+        assertEquals("顺炮", OpeningBook.lineName(listOf("h2e2", "h7e7")))
+        assertEquals("顺炮", OpeningBook.lineName(listOf("b2e2", "b7e7")))
+        assertEquals("仙人指路", OpeningBook.lineName(listOf("c3c4")))
+        assertEquals("对兵局", OpeningBook.lineName(listOf("c3c4", "c6c5")))
+        assertEquals("飞相局", OpeningBook.lineName(listOf("g0e2")))
+        // Untagged moves keep the earlier tag; an untagged first
+        // move and an empty history have no line name.
+        assertEquals(
+            "中炮",
+            OpeningBook.lineName(listOf("h2e2", "h9g7", "h0g2"))
+        )
+        assertNull(OpeningBook.lineName(listOf("h0g2")))
+        assertNull(OpeningBook.lineName(emptyList()))
+        // Every 4–6 ply node the guess pool draws from resolves
+        // to one of the book's real line names.
+        val known = setOf("中炮", "顺炮", "仙人指路", "飞相局", "对兵局")
+        for (node in OpeningBook.allNodes()) {
+            if (node.historyUci.size in 4..6) {
+                val name = OpeningBook.lineName(node.historyUci)
+                assertTrue(
+                    "unexpected line name $name for ${node.historyUci}",
+                    name == null || name in known
                 )
             }
         }

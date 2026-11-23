@@ -72,4 +72,23 @@ class TrainingPoolsTest {
             assertTrue("unparseable FEN for $label: $fen", parsed != null)
         }
     }
+
+    @Test
+    fun openingLabelsNameTheirLine() {
+        // Since 1.33.0 the label leads with the 定式 line name
+        // (OpeningBook.lineName) when the line carries one, so a
+        // question says which line the position comes from.
+        val known = listOf("中炮", "顺炮", "仙人指路", "飞相局", "对兵局")
+        var named = 0
+        for ((label, _) in GuessPositions.opening) {
+            assertTrue(label.contains("定式走了"))
+            val hit = known.firstOrNull { label.startsWith("$it · ") }
+            if (hit != null) named++
+        }
+        // Every current line starts from a named first move, so
+        // the whole pool is named today; the floor guards the
+        // feature against silently disappearing if the book
+        // grows an unnamed line later.
+        assertTrue("only $named named labels", named >= 12)
+    }
 }

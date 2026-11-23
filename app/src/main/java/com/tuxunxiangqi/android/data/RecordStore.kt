@@ -22,8 +22,66 @@ data class GameRecord(
     val initialFen: String,
     val movesUci: List<String>,
     val evals: Map<Int, Int>,
-    val marks: Map<Int, String> = emptyMap()
+    val marks: Map<Int, String> = emptyMap(),
+    /** Deep single-step analysis results (1.33.0), keyed by the
+     *  review page's step index (0 = initial position); each
+     *  value is the [encodeDeepStep] form of that step's engine
+     *  candidates. Before 1.33.0 deep results lived only in the
+     *  review page's memory and were lost on exit; now they are
+     *  saved with the record and travel in exports. */
+    val deep: Map<Int, String> = emptyMap()
 )
+
+/** One candidate of a stored deep-analysis step: the move, its
+ *  score from the side to move (centipawns or mate distance,
+ *  exactly one of the two, or neither when the engine gave no
+ *  score) and the principal variation as UCI moves. */
+data class DeepStepCandidate(
+    val moveUci: String,
+    val scoreCp: Int?,
+    val mateIn: Int?,
+    val pvUci: List<String>
+)
+
+/** Encodes one step's deep candidates into a single line:
+ *  candidates joined by ";", each "move,score,pv" where score
+ *  is "c<centipawns>", "m<mate in>" or "-" and pv is up to 12
+ *  UCI moves joined by spaces (possibly empty). The alphabet
+ *  deliberately excludes "|" and ":" so a whole record's steps
+ *  can ride one portable-text line as "idx:encoded" pairs
+ *  joined by " | ". Pure, pinned by DeepCodecTest. */
+fun encodeDeepStep(candidates: List<DeepStepCandidate>): String =
+    candidates.joinToString(";") { c ->
+        val score = when {
+            c.scoreCp != null -> "c" + c.scoreCp
+            c.mateIn != null -> "m" + c.mateIn
+            else -> "-"
+        }
+        c.moveUci + "," + score + "," +
+            c.pvUci.take(12).joinToString(" ")
+    }
+
+/** Parses the [encodeDeepStep] form back; malformed candidates
+ *  are skipped, so one bad entry never loses the whole step. */
+fun parseDeepStep(text: String): List<DeepStepCandidate> {
+    val out = ArrayList<DeepStepCandidate>()
+    for (part in text.split(";")) {
+        val fields = part.trim().split(",", limit = 3)
+        if (fields.size < 2) continue
+        val move = fields[0].trim()
+        if (move.isBlank()) continue
+        val token = fields[1].trim()
+        val cp = if (token.startsWith("c")) token.drop(1).toIntOrNull() else null
+        val mate = if (token.startsWith("m")) token.drop(1).toIntOrNull() else null
+        val pv = if (fields.size == 3) {
+            fields[2].split(Regex("\\s+")).filter { it.isNotBlank() }
+        } else {
+            emptyList()
+        }
+        out.add(DeepStepCandidate(move, cp, mate, pv))
+    }
+    return out
+}
 
 /** Plain JSON file storage for game records (no database needed at
  *  this scale). All calls are synchronous file IO on the caller's
@@ -56,6 +114,17 @@ class RecordStore(context: Context) {
                     val k = mKeys.next()
                     marks[k.toInt()] = marksObj.getString(k)
                 }
+                val deepObj = o.optJSONObject("deep") ?: JSONObject()
+                val deep = HashMap<Int, String>()
+                val dKeys = deepObj.keys()
+                while (dKeys.hasNext()) {
+                    val k = dKeys.next()
+                    val step = k.toIntOrNull()
+                    val encoded = deepObj.optString(k, "")
+                    if (step != null && encoded.isNotBlank()) {
+                        deep[step] = encoded
+                    }
+                }
                 out.add(
                     GameRecord(
                         id = o.getLong("id"),
@@ -66,7 +135,8 @@ class RecordStore(context: Context) {
                         initialFen = o.optString("fen", ""),
                         movesUci = moves,
                         evals = evals,
-                        marks = marks
+                        marks = marks,
+                        deep = deep
                     )
                 )
             }
@@ -122,6 +192,9 @@ class RecordStore(context: Context) {
             val marks = JSONObject()
             for ((k, v) in r.marks) marks.put(k.toString(), v)
             o.put("marks", marks)
+            val deep = JSONObject()
+            for ((k, v) in r.deep) deep.put(k.toString(), v)
+            o.put("deep", deep)
             arr.put(o)
         }
         file.writeText(arr.toString())
@@ -307,6 +380,12 @@ fun GameRecord.toPortableText(): String {
             .joinToString(" ") { "${it.key}:${it.value}" })
         sb.append('\n')
     }
+    if (deep.isNotEmpty()) {
+        sb.append("[深析] ")
+        sb.append(deep.entries.sortedBy { it.key }
+            .joinToString(" | ") { "${it.key}:${it.value}" })
+        sb.append('\n')
+    }
     return sb.toString()
 }
 
@@ -354,6 +433,7 @@ private fun parsePortableBlock(lines: List<String>, id: Long): GameRecord? {
     var moves: List<String> = emptyList()
     val evals = HashMap<Int, Int>()
     val marks = HashMap<Int, String>()
+    val deep = HashMap<Int, String>()
     for (raw in lines) {
         val line = raw.trim()
         fun value(tag: String): String? =
@@ -384,6 +464,17 @@ private fun parsePortableBlock(lines: List<String>, id: Long): GameRecord? {
                 }
             }
         }
+        value("深析")?.let {
+            for (part in it.split("|")) {
+                val trimmed = part.trim()
+                val colon = trimmed.indexOf(':')
+                if (colon > 0) {
+                    val k = trimmed.substring(0, colon).toIntOrNull()
+                    val v = trimmed.substring(colon + 1).trim()
+                    if (k != null && v.isNotBlank()) deep[k] = v
+                }
+            }
+        }
     }
     if (fen.isBlank()) return null
     return GameRecord(
@@ -395,6 +486,7 @@ private fun parsePortableBlock(lines: List<String>, id: Long): GameRecord? {
         initialFen = fen,
         movesUci = moves,
         evals = evals,
-        marks = marks
+        marks = marks,
+        deep = deep
     )
 }

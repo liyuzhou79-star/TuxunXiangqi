@@ -1,6 +1,7 @@
 package com.tuxunxiangqi.android
 
 import com.tuxunxiangqi.android.data.Puzzles
+import com.tuxunxiangqi.android.data.recentDailyStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,5 +48,27 @@ class DailyPuzzleTest {
             Puzzles.dailyForEpochDay(it).id
         }
         assertEquals(7, ids.toSet().size)
+    }
+    @Test
+    fun recentDailyStatusWalksTheLastSevenDays() {
+        // Career-page dot row data (1.33.0): oldest first,
+        // today last, flags straight from the solved-day set.
+        val today = 21000L
+        val days = setOf(today, today - 1, today - 3, today - 6, today - 9)
+        val rows = recentDailyStatus(days, today)
+        assertEquals(7, rows.size)
+        assertEquals(
+            listOf(today - 6, today - 5, today - 4, today - 3, today - 2, today - 1, today),
+            rows.map { it.first }
+        )
+        assertEquals(
+            listOf(true, false, false, true, false, true, true),
+            rows.map { it.second }
+        )
+        // Nothing solved: a clean row of misses, still 7 long.
+        assertEquals(
+            List(7) { false },
+            recentDailyStatus(emptySet(), today).map { it.second }
+        )
     }
 }

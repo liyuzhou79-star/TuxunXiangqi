@@ -55,6 +55,20 @@ fun dailyStreak(days: Set<Long>, todayEpochDay: Long): Int {
     return streak
 }
 
+/** The last [count] days up to and including today, oldest
+ *  first, each paired with whether the daily puzzle was solved
+ *  that day. Drives the career page's recent-days dot row
+ *  (1.33.0). Pure, pinned by unit tests. */
+fun recentDailyStatus(
+    days: Set<Long>,
+    todayEpochDay: Long,
+    count: Int = 7
+): List<Pair<Long, Boolean>> =
+    (count - 1 downTo 0).map { back ->
+        val day = todayEpochDay - back
+        day to (day in days)
+    }
+
 /** Parses the [PuzzleProgress.encode] form back. Tolerant of
  *  unknown sections and bad entries (they are skipped); null
  *  only when the text is blank or has no recognisable section,

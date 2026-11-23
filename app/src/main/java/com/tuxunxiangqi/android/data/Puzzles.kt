@@ -417,7 +417,12 @@ object GuessPositions {
             val fen = Fen.toFen(gs)
             if (!seen.add(fen)) continue
             val notes = OpeningBook.historyNotation(node.historyUci)
-            val label = "定式走了 " + plies + " 手 · " +
+            // The label names the 定式 line the position comes
+            // from (1.33.0) so a question reads as a position
+            // from a real line, not an anonymous book node.
+            val line = OpeningBook.lineName(node.historyUci)
+            val label = (if (line != null) "$line · " else "") +
+                "定式走了 " + plies + " 手 · " +
                 notes.takeLast(2).joinToString(" ")
             out.add(label to fen)
         }

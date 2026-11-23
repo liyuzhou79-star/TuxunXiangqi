@@ -45,13 +45,17 @@ import androidx.core.view.drawToBitmap
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tuxunxiangqi.android.data.DeepStepCandidate
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.data.canContinue
+import com.tuxunxiangqi.android.data.encodeDeepStep
+import com.tuxunxiangqi.android.data.parseDeepStep
 import com.tuxunxiangqi.android.data.sourceLabel
 import com.tuxunxiangqi.android.data.sourceNote
 import com.tuxunxiangqi.android.data.toPortableText
 import com.tuxunxiangqi.android.engine.AnalysisResult
+import com.tuxunxiangqi.android.engine.Candidate
 import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
@@ -142,8 +146,10 @@ fun ReviewScreen(
     // Single-step deep analysis: one position gets a long,
     // four-candidate look (2 s MultiPV 4). It and the whole-game
     // batch run exclude each other so the two never fight over
-    // the one resident engine. The result lives in memory only —
-    // it is never written back into the stored record.
+    // the one resident engine. Since 1.33.0 a finished result is
+    // also written back into the stored record (deep field), so
+    // it survives leaving the page and rides along in exports;
+    // before that it lived in this page's memory only.
     var deepBusy by remember { mutableStateOf(false) }
     var deepIdx by remember { mutableStateOf(-1) }
     // Results are cached per step: deep-analysing another step
@@ -151,6 +157,31 @@ fun ReviewScreen(
     // back shows it again without re-running the engine.
     val deepCache = remember { mutableStateMapOf<Int, AnalysisResult>() }
     val deepErrors = remember { mutableStateMapOf<Int, String>() }
+    // Seed the cache from the deep results stored with the
+    // record, so a step analysed on an earlier visit — or one
+    // that arrived inside an imported record — shows its card
+    // again immediately. Depth is not stored; nothing on this
+    // page displays it, so seeded results carry 0.
+    LaunchedEffect(record.id) {
+        for ((step, encoded) in record.deep) {
+            if (step in deepCache) continue
+            val stored = parseDeepStep(encoded)
+            if (stored.isEmpty()) continue
+            deepCache[step] = AnalysisResult(
+                candidates = stored.mapIndexed { i, c ->
+                    Candidate(
+                        rank = i + 1,
+                        moveUci = c.moveUci,
+                        scoreCp = c.scoreCp,
+                        mateIn = c.mateIn,
+                        depth = 0,
+                        pvUci = c.pvUci
+                    )
+                },
+                depth = 0
+            )
+        }
+    }
     // Candidate selection in the deep card, unified with the
     // in-game analysis panel (1.13.0): one candidate is always
     // selected (the top one by default), tapping a card switches
@@ -291,7 +322,29 @@ fun ReviewScreen(
             // stepped elsewhere meanwhile — nothing is thrown away.
             when {
                 err != null -> deepErrors[atIdx] = err
-                res != null -> deepCache[atIdx] = res
+                res != null -> {
+                    deepCache[atIdx] = res
+                    // Persist with the record (1.33.0): the same
+                    // write-back path the batch analysis uses for
+                    // evals/marks, so the deep card is still here
+                    // next visit and exports carry it.
+                    val encoded = encodeDeepStep(
+                        res.candidates.map {
+                            DeepStepCandidate(
+                                it.moveUci, it.scoreCp, it.mateIn, it.pvUci
+                            )
+                        }
+                    )
+                    if (encoded.isNotBlank() &&
+                        liveRecord.deep[atIdx] != encoded
+                    ) {
+                        val updated = liveRecord.copy(
+                            deep = liveRecord.deep + (atIdx to encoded)
+                        )
+                        recordStore.save(updated)
+                        liveRecord = updated
+                    }
+                }
                 else -> deepErrors[atIdx] = "引擎暂时没给出候选。"
             }
         }
@@ -911,7 +964,7 @@ fun ReviewScreen(
                             }
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "深析结果只在这页临时看，不会存进棋谱。",
+                                text = "深析结果会存进这条棋谱，下次打开还在，导出棋谱时也会带上。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

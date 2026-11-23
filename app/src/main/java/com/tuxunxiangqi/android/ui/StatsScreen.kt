@@ -1,13 +1,20 @@
 package com.tuxunxiangqi.android.ui
 
 import android.content.Context
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,6 +61,16 @@ fun StatsScreen(onBack: () -> Unit) {
         val days = p.getStringSet("daily_days", emptySet()).orEmpty()
             .mapNotNull { it.toLongOrNull() }.toSet()
         days.size to com.tuxunxiangqi.android.data.dailyStreak(
+            days, java.time.LocalDate.now().toEpochDay()
+        )
+    }
+    // Recent seven days for the dot row under the daily line
+    // (1.33.0): (epochDay, solved) oldest first, today last.
+    val recentDaily = remember {
+        val p = context.getSharedPreferences("puzzles", Context.MODE_PRIVATE)
+        val days = p.getStringSet("daily_days", emptySet()).orEmpty()
+            .mapNotNull { it.toLongOrNull() }.toSet()
+        com.tuxunxiangqi.android.data.recentDailyStatus(
             days, java.time.LocalDate.now().toEpochDay()
         )
     }
@@ -179,6 +196,71 @@ fun StatsScreen(onBack: () -> Unit) {
                         },
                     style = MaterialTheme.typography.bodyMedium
                 )
+                // Last seven days as dots (1.33.0): a filled dot
+                // is a solved day, today carries a ring so the
+                // row reads at a glance next to the numbers.
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    for ((epochDay, done) in recentDaily) {
+                        val date = java.time.LocalDate.ofEpochDay(epochDay)
+                        val isToday = epochDay ==
+                            java.time.LocalDate.now().toEpochDay()
+                        Column(
+                            horizontalAlignment =
+                                androidx.compose.ui.Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .then(
+                                        if (isToday) {
+                                            Modifier.border(
+                                                1.5.dp,
+                                                MaterialTheme.colorScheme.primary,
+                                                CircleShape
+                                            )
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                                    .background(
+                                        if (done) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme
+                                                .surfaceContainerHighest
+                                        },
+                                        CircleShape
+                                    )
+                            )
+                            Text(
+                                text = if (isToday) {
+                                    "今"
+                                } else {
+                                    when (date.dayOfWeek) {
+                                        java.time.DayOfWeek.MONDAY -> "一"
+                                        java.time.DayOfWeek.TUESDAY -> "二"
+                                        java.time.DayOfWeek.WEDNESDAY -> "三"
+                                        java.time.DayOfWeek.THURSDAY -> "四"
+                                        java.time.DayOfWeek.FRIDAY -> "五"
+                                        java.time.DayOfWeek.SATURDAY -> "六"
+                                        else -> "日"
+                                    }
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Text(
+                        text = "近 7 天每日一题",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             for (cat in Puzzles.categoryOrder) {
                 val inCat = Puzzles.all.filter { Puzzles.categoryOf(it.id) == cat }

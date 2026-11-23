@@ -249,6 +249,31 @@ object OpeningBook {
     fun historyNotation(historyUci: List<String>): List<String> =
         Notation.pvText(GameState().cells.toList(), historyUci, historyUci.size)
 
+    /** The named 定式 line a history belongs to, or null when
+     *  no move along the way carries a name. Book names tag the
+     *  defining moves in brackets — 炮二平五（中炮）, the reply
+     *  炮8平5（顺炮）, 卒3进1（对兵局） — and the LAST tag on
+     *  the path is the most specific line the position belongs
+     *  to （中炮 lines answered by a central cannon are 顺炮；
+     *  仙人指路 answered by a pawn is 对兵局）. Pure: derived
+     *  only from the book itself, pinned by OpeningBookTest. */
+    fun lineName(historyUci: List<String>): String? {
+        var name: String? = null
+        var prefix = emptyList<String>()
+        for (uci in historyUci) {
+            val suggestion = lookup(prefix).firstOrNull { it.first == uci }
+                ?: return name
+            val printed = suggestion.second
+            val open = printed.indexOf('（')
+            val close = printed.indexOf('）')
+            if (open >= 0 && close > open + 1) {
+                name = printed.substring(open + 1, close)
+            }
+            prefix = prefix + uci
+        }
+        return name
+    }
+
     /** Whose turn it is after a move history from the standard
      *  start: Red moves first and the sides alternate, so an
      *  even-length history leaves Red to move. (Validated for
