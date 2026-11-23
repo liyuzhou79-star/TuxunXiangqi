@@ -853,6 +853,7 @@ fun ReviewScreen(
                     Spacer(Modifier.height(6.dp))
                     DeepLossChart(
                         points = deepLossPts,
+                        highlightStep = idx,
                         onSelectStep = { step ->
                             playing = false
                             replayStopAt = null

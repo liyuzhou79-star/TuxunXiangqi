@@ -3,6 +3,7 @@ package com.tuxunxiangqi.android
 import com.tuxunxiangqi.android.data.GuessPositions
 import com.tuxunxiangqi.android.data.Puzzles
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -22,6 +23,46 @@ class TrainingPoolsTest {
         assertEquals(
             Puzzles.all.size,
             Puzzles.filterPuzzles(Puzzles.all, null, false, emptySet()).size
+        )
+    }
+
+    @Test
+    fun nextUnsolvedPrefersSameCategory() {
+        // The 1.38.0 "next unsolved" jump: after puzzle 1
+        // （双车类）, the next unsolved 双车类 puzzle comes
+        // before any other category.
+        val next = Puzzles.nextUnsolved(emptySet(), 1)
+        assertEquals(16, next?.id)
+        assertEquals("双车类", Puzzles.categoryOf(next!!.id))
+    }
+
+    @Test
+    fun nextUnsolvedSkipsSolvedAndFallsBack() {
+        // All other 双车类 solved: fall back to the first
+        // unsolved puzzle anywhere after the current one.
+        val sameCat = Puzzles.all
+            .filter { Puzzles.categoryOf(it.id) == "双车类" && it.id != 1 }
+            .map { it.id }.toSet()
+        val next = Puzzles.nextUnsolved(sameCat, 1)
+        assertEquals(2, next?.id)
+        // Everything else solved: no next puzzle.
+        val allButCurrent = Puzzles.all
+            .filter { it.id != 1 }.map { it.id }.toSet()
+        assertNull(Puzzles.nextUnsolved(allButCurrent, 1))
+        // Unknown current id: no answer.
+        assertNull(Puzzles.nextUnsolved(emptySet(), 9999))
+    }
+
+    @Test
+    fun nextUnsolvedWrapsAround() {
+        // From the last puzzle, the search wraps to the head
+        // of the list (same category first).
+        val last = Puzzles.all.last()
+        val next = Puzzles.nextUnsolved(emptySet(), last.id)
+        assertTrue(next != null && next.id != last.id)
+        assertEquals(
+            Puzzles.categoryOf(last.id),
+            Puzzles.categoryOf(next!!.id)
         )
     }
 

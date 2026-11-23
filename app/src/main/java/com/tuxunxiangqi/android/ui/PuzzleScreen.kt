@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -109,9 +110,19 @@ fun PuzzleScreen(onBack: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
     if (playing != null) {
+        // key() on the puzzle id (1.38.0): jumping straight to
+        // the next puzzle recreates the play screen, so none of
+        // its per-attempt state (solved flag, move count, hint
+        // cards) can leak into the new puzzle.
+        key(playing!!.id) {
         PuzzlePlay(
             puzzle = playing!!,
             modifier = Modifier.padding(padding),
+            nextPuzzle = Puzzles.nextUnsolved(solvedIds, playing!!.id),
+            onNextPuzzle = { next ->
+                playingDailyDay = null
+                playing = next
+            },
             onExit = {
                 playing = null
                 playingDailyDay = null
@@ -162,6 +173,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 editor.apply()
             }
         )
+        }
     } else {
 
     val daily = Puzzles.daily(Calendar.getInstance().get(Calendar.DAY_OF_YEAR))
@@ -421,6 +433,11 @@ fun PuzzleScreen(onBack: () -> Unit) {
 private fun PuzzlePlay(
     puzzle: Puzzle,
     modifier: Modifier = Modifier,
+    /** The next unsolved puzzle to jump to (1.38.0), computed
+     *  by the list side from the live solved set; null hides
+     *  the jump button (everything else is solved). */
+    nextPuzzle: Puzzle? = null,
+    onNextPuzzle: ((Puzzle) -> Unit)? = null,
     onExit: () -> Unit,
     /** steps = the user's own move count on a genuine solve;
      *  null when the demo solved it (never a personal best).
@@ -744,6 +761,12 @@ private fun PuzzlePlay(
                 },
                 enabled = !busy || demoOn
             ) { Text(if (demoOn) "停止演示" else "看正解演示") }
+            if (nextPuzzle != null && onNextPuzzle != null) {
+                Button(
+                    onClick = { onNextPuzzle(nextPuzzle) },
+                    enabled = !busy && !demoOn
+                ) { Text("下一道未解的题") }
+            }
         }
         Spacer(Modifier.height(24.dp))
     }

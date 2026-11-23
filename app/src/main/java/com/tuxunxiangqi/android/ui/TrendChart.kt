@@ -161,6 +161,7 @@ fun nearestDeepLossStep(
 fun DeepLossChart(
     points: List<Pair<Int, Int>>,
     modifier: Modifier = Modifier,
+    highlightStep: Int? = null,
     onSelectStep: ((Int) -> Unit)? = null
 ) {
     val plainColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -169,6 +170,7 @@ fun DeepLossChart(
     val blunderColor = MaterialTheme.colorScheme.error
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
         .copy(alpha = 0.5f)
+    val highlightColor = MaterialTheme.colorScheme.tertiary
     val tapModifier = if (onSelectStep != null && points.isNotEmpty()) {
         Modifier.pointerInput(points, onSelectStep) {
             detectTapGestures { offset ->
@@ -210,6 +212,23 @@ fun DeepLossChart(
                     barWidth, barHeight
                 )
             )
+            // Current-step ring (1.38.0): the bar for the step
+            // the board is showing gets an outline, mirroring
+            // the trend chart's highlight so the two charts
+            // read the same way.
+            if (highlightStep != null && points[i].first == highlightStep) {
+                drawRect(
+                    color = highlightColor,
+                    topLeft = Offset(
+                        left - 3f,
+                        size.height - barHeight - 3f
+                    ),
+                    size = androidx.compose.ui.geometry.Size(
+                        barWidth + 6f, barHeight + 3f
+                    ),
+                    style = Stroke(width = 2.5f)
+                )
+            }
         }
     }
 }

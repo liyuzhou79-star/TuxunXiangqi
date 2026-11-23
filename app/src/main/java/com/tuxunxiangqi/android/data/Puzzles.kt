@@ -317,6 +317,21 @@ object Puzzles {
 
     fun difficultyOf(id: Int): Int = difficultyById[id] ?: 2
 
+    /** The next puzzle to practise after [currentId] (1.38.0):
+     *  unsolved ones in the same category first (list order,
+     *  wrapping around), then unsolved ones anywhere else.
+     *  Null when every other puzzle is already solved. Pure,
+     *  pinned by unit tests. */
+    fun nextUnsolved(solved: Set<Int>, currentId: Int): Puzzle? {
+        val idx = all.indexOfFirst { it.id == currentId }
+        if (idx < 0) return null
+        val cat = categoryOf(currentId)
+        val ordered = all.drop(idx + 1) + all.take(idx)
+        return ordered.firstOrNull {
+            it.id !in solved && categoryOf(it.id) == cat
+        } ?: ordered.firstOrNull { it.id !in solved }
+    }
+
     /** The list page's filter (1.19.0): keep puzzles of one
      *  difficulty tier (null = all tiers) and optionally only
      *  the ones not solved yet. Pure, so the tier distribution
