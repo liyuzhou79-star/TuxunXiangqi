@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.R
 import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.Piece
+import com.tuxunxiangqi.android.xiangqi.PieceType
 import com.tuxunxiangqi.android.xiangqi.Pos
 import com.tuxunxiangqi.android.xiangqi.Rules
 import com.tuxunxiangqi.android.xiangqi.Side
