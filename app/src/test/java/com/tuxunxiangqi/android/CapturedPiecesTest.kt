@@ -97,4 +97,29 @@ class CapturedPiecesTest {
             t.capturedBy(Side.RED)
         )
     }
+
+    /** The pure snapshot form (used by the review screen) must
+     *  agree with the live-game form on the same positions. */
+    @Test
+    fun capturedBetweenMatchesLiveGame() {
+        val gs = GameState()
+        assertTrue(gs.tryMove(Pos(2, 6), Pos(2, 5))) // 兵七进一
+        assertTrue(gs.tryMove(Pos(2, 3), Pos(2, 4))) // 卒3进1
+        assertTrue(gs.tryMove(Pos(2, 5), Pos(2, 4))) // 兵吃卒 (a real capture)
+        assertTrue(gs.tryMove(Pos(7, 0), Pos(6, 2))) // 马8进7
+        assertEquals(
+            listOf(Piece(PieceType.SOLDIER, Side.BLACK)),
+            gs.capturedBy(Side.RED)
+        )
+        for (side in Side.values()) {
+            assertEquals(
+                gs.capturedBy(side),
+                GameState.capturedBetween(gs.initialCells, gs.cells, side)
+            )
+            assertEquals(
+                gs.materialScore(side),
+                GameState.materialOf(gs.cells, side)
+            )
+        }
+    }
 }

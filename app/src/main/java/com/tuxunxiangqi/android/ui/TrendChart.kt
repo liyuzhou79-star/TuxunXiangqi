@@ -21,11 +21,13 @@ import androidx.compose.ui.unit.dp
 fun EvalTrendChart(
     points: List<Pair<Int, Int>>,
     modifier: Modifier = Modifier,
-    big: Boolean = false
+    big: Boolean = false,
+    highlightMove: Int? = null
 ) {
     val lineColor = MaterialTheme.colorScheme.primary
     val keyColor = MaterialTheme.colorScheme.error
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val highlightColor = MaterialTheme.colorScheme.tertiary
     Canvas(
         modifier = modifier
             .fillMaxWidth()
@@ -67,6 +69,26 @@ fun EvalTrendChart(
                 radius = if (isKey) 5f else 3f,
                 center = Offset(x(moveIdx), y(cp))
             )
+        }
+        // Review linkage: ring + guide line on the step currently
+        // shown on the board, so chart and board stay in sync.
+        if (highlightMove != null) {
+            val hp = points.firstOrNull { it.first == highlightMove }
+            if (hp != null) {
+                val hx = x(hp.first)
+                drawLine(
+                    color = highlightColor.copy(alpha = 0.45f),
+                    start = Offset(hx, 0f),
+                    end = Offset(hx, size.height),
+                    strokeWidth = 1.5f
+                )
+                drawCircle(
+                    color = highlightColor,
+                    radius = 7f,
+                    center = Offset(hx, y(hp.second)),
+                    style = Stroke(width = 2.5f)
+                )
+            }
         }
     }
 }

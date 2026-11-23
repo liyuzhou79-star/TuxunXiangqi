@@ -311,32 +311,48 @@ class GameState {
      *  Derived from state rather than the move list, so undo,
      *  restart, handicap starts and editor starts all stay
      *  correct automatically. Sorted strongest first. */
-    fun capturedBy(side: Side): List<Piece> {
-        val foe = side.other()
-        val missing = ArrayList<Piece>()
-        for (type in PieceType.values()) {
-            if (type == PieceType.GENERAL) continue
-            val started = initialCells.count {
-                it != null && it.side == foe && it.type == type
-            }
-            val alive = cells.count {
-                it != null && it.side == foe && it.type == type
-            }
-            repeat((started - alive).coerceAtLeast(0)) {
-                missing.add(Piece(type, foe))
-            }
-        }
-        return missing.sortedByDescending { materialValue(it.type) }
-    }
+    fun capturedBy(side: Side): List<Piece> =
+        capturedBetween(initialCells, cells, side)
 
     /** Rough material strength of [side]'s pieces still on the
      *  board, in the usual display points （车 600 / 炮 285 /
      *  马 270 / 士象 120 / 兵 60). For the captured-pieces strip
      *  only — never used for adjudication. */
-    fun materialScore(side: Side): Int =
-        cells.sumOf {
-            if (it != null && it.side == side) materialValue(it.type) else 0
+    fun materialScore(side: Side): Int = materialOf(cells, side)
+
+    companion object {
+        /** Pure form of [capturedBy] for callers that hold two
+         *  snapshots instead of a live game — the review screen
+         *  derives each step's captures from the record's start
+         *  position and the displayed step. */
+        fun capturedBetween(
+            initial: List<Piece?>,
+            current: List<Piece?>,
+            side: Side
+        ): List<Piece> {
+            val foe = side.other()
+            val missing = ArrayList<Piece>()
+            for (type in PieceType.values()) {
+                if (type == PieceType.GENERAL) continue
+                val started = initial.count {
+                    it != null && it.side == foe && it.type == type
+                }
+                val alive = current.count {
+                    it != null && it.side == foe && it.type == type
+                }
+                repeat((started - alive).coerceAtLeast(0)) {
+                    missing.add(Piece(type, foe))
+                }
+            }
+            return missing.sortedByDescending { materialValue(it.type) }
         }
+
+        /** Pure form of [materialScore] over an arbitrary snapshot. */
+        fun materialOf(cells: List<Piece?>, side: Side): Int =
+            cells.sumOf {
+                if (it != null && it.side == side) materialValue(it.type) else 0
+            }
+    }
 
     init {
         reset()

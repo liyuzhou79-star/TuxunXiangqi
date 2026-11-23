@@ -180,10 +180,19 @@ private fun MiniPieceDisc(piece: Piece) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CapturedStrip(state: GameState) {
-    val redCaps = state.capturedBy(Side.RED)
-    val blackCaps = state.capturedBy(Side.BLACK)
+    CapturedStrip(state.initialCells, state.cells)
+}
+
+/** Snapshot form, shared with the review screen: captures derived
+ *  from the game's start position and the displayed position. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun CapturedStrip(initialCells: List<Piece?>, currentCells: List<Piece?>) {
+    val redCaps = GameState.capturedBetween(initialCells, currentCells, Side.RED)
+    val blackCaps = GameState.capturedBetween(initialCells, currentCells, Side.BLACK)
     if (redCaps.isEmpty() && blackCaps.isEmpty()) return
-    val diff = state.materialScore(Side.RED) - state.materialScore(Side.BLACK)
+    val diff = GameState.materialOf(currentCells, Side.RED) -
+        GameState.materialOf(currentCells, Side.BLACK)
     fun edgeText(points: Int): String {
         val pawns = points / 60.0
         val num = if (pawns == pawns.toInt().toDouble()) {

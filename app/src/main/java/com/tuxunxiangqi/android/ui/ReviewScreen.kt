@@ -179,6 +179,7 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(12.dp))
+        CapturedStrip(snapshots[0].first, snapshots[idx].first)
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -269,7 +270,14 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                     Spacer(Modifier.height(8.dp))
                     EvalTrendChart(
                         points = trendPoints,
-                        modifier = Modifier.fillMaxWidth().height(72.dp)
+                        modifier = Modifier.fillMaxWidth().height(72.dp),
+                        highlightMove = idx
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "图上的圈是你现在看的这一步，拖动上面的滑杆或步进，圈会跟着走。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (swings.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
