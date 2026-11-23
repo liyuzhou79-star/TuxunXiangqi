@@ -40,7 +40,6 @@ import com.tuxunxiangqi.android.engine.Candidate
 import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.engine.SoundFx
 import com.tuxunxiangqi.android.engine.SoundKind
-import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.Notation
@@ -73,6 +72,11 @@ fun GuessScreen(onBack: () -> Unit) {
     var verdict by remember { mutableStateOf<String?>(null) }
     var candidates by remember { mutableStateOf<List<Candidate>>(emptyList()) }
     var hintMove by remember { mutableStateOf<Pair<Pos, Pos>?>(null) }
+    // After judging, the candidates show as the same tappable
+    // cards the game and review screens use (unified in 1.14.0):
+    // tapping one points the board arrow at it.
+    var selectedCandRank by remember { mutableStateOf<Int?>(null) }
+    var lastGuessUci by remember { mutableStateOf<String?>(null) }
     var asked by remember { mutableStateOf(0) }
     var correct by remember { mutableStateOf(0) }
     var notice by remember { mutableStateOf<String?>(null) }
@@ -109,6 +113,8 @@ fun GuessScreen(onBack: () -> Unit) {
         verdict = null
         candidates = emptyList()
         hintMove = null
+        selectedCandRank = null
+        lastGuessUci = null
         notice = null
         questionId++
         secondsLeft = 30
@@ -197,6 +203,8 @@ fun GuessScreen(onBack: () -> Unit) {
             candidates = cands
             val best = cands.first()
             hintMove = Fen.parseUciMove(best.moveUci)
+            selectedCandRank = 1
+            lastGuessUci = guessUci
             asked++
             revealed = true
             val guessRank = cands.firstOrNull { it.moveUci == guessUci }?.rank
@@ -420,19 +428,27 @@ fun GuessScreen(onBack: () -> Unit) {
                         fontWeight = FontWeight.SemiBold
                     )
                     if (candidates.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        for (cand in candidates) {
-                            val mv = Fen.parseUciMove(cand.moveUci) ?: continue
-                            val (redCp, redMate) = EvalUtil.toRedPerspective(
-                                cand.scoreCp, cand.mateIn, gs.turn
-                            )
-                            Text(
-                                text = "第 " + cand.rank + " 位：" +
-                                    Notation.moveText(gs.cells, mv.first, mv.second) +
-                                    " — " + EvalUtil.describeRed(redCp, redMate),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = "点任意候选，棋盘箭头会换成那一步。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        val cards = buildCandidateCards(
+                            gs.cells.toList(), gs.turn, candidates
+                        )
+                        CandidateCardList(
+                            cards = cards,
+                            selectedRank = selectedCandRank,
+                            onSelect = { card ->
+                                selectedCandRank = card.rank
+                                hintMove = card.from to card.to
+                            },
+                            tagFor = { card ->
+                                if (card.moveUci == lastGuessUci) "你猜的这步" else null
+                            }
+                        )
                     }
                 }
             }

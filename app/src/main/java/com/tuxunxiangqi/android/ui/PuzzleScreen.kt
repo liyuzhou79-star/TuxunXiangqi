@@ -224,22 +224,40 @@ private fun PuzzlePlay(
     var usedHint by remember(puzzle.id) { mutableStateOf(false) }
     var hintBusy by remember { mutableStateOf(false) }
     var hintMove by remember(puzzle.id) { mutableStateOf<Pair<Pos, Pos>?>(null) }
+    // Since 1.14.0 the hint shows the engine's top four as the
+    // same tappable candidate cards the game and review screens
+    // use: tapping one points the board arrow at it. One ask
+    // still costs exactly one of the three hints.
+    var hintCards by remember(puzzle.id) {
+        mutableStateOf<List<CandidateCardData>>(emptyList())
+    }
+    var hintSelRank by remember(puzzle.id) { mutableStateOf<Int?>(null) }
+
+    fun clearHintCards() {
+        hintCards = emptyList()
+        hintSelRank = null
+    }
 
     fun askHint() {
         if (busy || demoOn || hintBusy || hintsLeft <= 0) return
         if (gs.result != null || gs.turn != Side.RED) return
         hintBusy = true
         status = "引擎正在想一步好棋……"
-        engine.analyze(Fen.toFen(gs), 800, multiPv = 1) { res, err ->
+        engine.analyze(Fen.toFen(gs), 800, multiPv = 4) { res, err ->
             hintBusy = false
             val best = res?.candidates?.firstOrNull()
             val mv = best?.let { Fen.parseUciMove(it.moveUci) }
-            if (mv != null) {
+            if (mv != null && res != null) {
                 hintsLeft--
                 usedHint = true
                 hintMove = mv
+                hintCards = buildCandidateCards(
+                    gs.cells.toList(), gs.turn, res.candidates
+                )
+                hintSelRank = 1
                 val text = Notation.moveText(gs.cells, mv.first, mv.second)
-                status = "提示：试试走「$text」。" +
+                status = "提示：一选是「$text」，下面四张候选卡点哪张，" +
+                    "棋盘箭头就指哪一步。" +
                     if (hintsLeft > 0) "这轮还剩 $hintsLeft 次提示。" else "提示次数用完了。"
             } else {
                 status = "引擎这次没能给出提示" +
@@ -281,6 +299,7 @@ private fun PuzzlePlay(
         userMoves++
         selected = null
         hintMove = null
+        clearHintCards()
         if (gs.result != null) {
             if (gs.result!!.winner == Side.RED) {
                 solved = true
@@ -427,6 +446,23 @@ private fun PuzzlePlay(
                 modifier = Modifier.padding(16.dp)
             )
         }
+        if (hintCards.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "引擎候选（点一张看箭头）",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(6.dp))
+            CandidateCardList(
+                cards = hintCards,
+                selectedRank = hintSelRank,
+                onSelect = { card ->
+                    hintSelRank = card.rank
+                    hintMove = card.from to card.to
+                }
+            )
+        }
         Spacer(Modifier.height(12.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
@@ -438,6 +474,7 @@ private fun PuzzlePlay(
                             userMoves = (userMoves - 1).coerceAtLeast(0)
                             selected = null
                             hintMove = null
+                            clearHintCards()
                             status = "已悔棋，重新想一步。"
                         }
                     }
@@ -455,6 +492,7 @@ private fun PuzzlePlay(
                         hintsLeft = 3
                         usedHint = false
                         hintMove = null
+                        clearHintCards()
                         status = "已重开。红先，请走第一步。"
                     }
                 },
@@ -466,7 +504,13 @@ private fun PuzzlePlay(
                     gs.result == null
             ) { Text("提示一步（剩 $hintsLeft 次）") }
             Button(
-                onClick = { demoOn = !demoOn },
+                onClick = {
+                    if (!demoOn) {
+                        hintMove = null
+                        clearHintCards()
+                    }
+                    demoOn = !demoOn
+                },
                 enabled = !busy || demoOn
             ) { Text(if (demoOn) "停止演示" else "看正解演示") }
             OutlinedButton(onClick = onExit) { Text("回题目列表") }
