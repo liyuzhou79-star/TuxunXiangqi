@@ -137,9 +137,16 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     /** Rebuilds the trial board: the position at the current
      *  step plus the first [step] moves of the candidate's PV.
      *  Rebuilding from scratch keeps stepping correct both ways;
-     *  the replayed record itself is never touched. */
-    fun applyDeepTrial(cand: com.tuxunxiangqi.android.engine.Candidate, step: Int) {
-        deepTrialState.loadPosition(displayState.cells.toList(), displayState.turn)
+     *  the replayed record itself is never touched. The base
+     *  position is passed in by the caller (the display state is
+     *  declared further down and cannot be forward-referenced). */
+    fun applyDeepTrial(
+        cand: com.tuxunxiangqi.android.engine.Candidate,
+        step: Int,
+        baseCells: List<Piece?>,
+        baseTurn: Side
+    ) {
+        deepTrialState.loadPosition(baseCells, baseTurn)
         val pv = cand.pvUci.take(12)
         val n = step.coerceIn(0, pv.size)
         for (i in 0 until n) {
@@ -149,10 +156,14 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         deepTrialStep = n
     }
 
-    fun startDeepTrial(cand: com.tuxunxiangqi.android.engine.Candidate) {
+    fun startDeepTrial(
+        cand: com.tuxunxiangqi.android.engine.Candidate,
+        baseCells: List<Piece?>,
+        baseTurn: Side
+    ) {
         deepSelectedRank = cand.rank
         deepTrialRank = cand.rank
-        applyDeepTrial(cand, 1)
+        applyDeepTrial(cand, 1, baseCells, baseTurn)
     }
 
     fun startBatchAnalysis() {
@@ -371,11 +382,21 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
-                            onClick = { applyDeepTrial(trialCand, deepTrialStep - 1) },
+                            onClick = {
+                                applyDeepTrial(
+                                    trialCand, deepTrialStep - 1,
+                                    displayState.cells.toList(), displayState.turn
+                                )
+                            },
                             enabled = deepTrialStep > 0
                         ) { Text("上一步") }
                         OutlinedButton(
-                            onClick = { applyDeepTrial(trialCand, deepTrialStep + 1) },
+                            onClick = {
+                                applyDeepTrial(
+                                    trialCand, deepTrialStep + 1,
+                                    displayState.cells.toList(), displayState.turn
+                                )
+                            },
                             enabled = deepTrialStep < trialPv.size
                         ) { Text("下一步") }
                         TextButton(onClick = { exitDeepTrial() }) { Text("退出试走") }
@@ -646,7 +667,11 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                                         ) {
                                             TextButton(
                                                 onClick = {
-                                                    startDeepTrial(cand)
+                                                    startDeepTrial(
+                                                        cand,
+                                                        displayState.cells.toList(),
+                                                        displayState.turn
+                                                    )
                                                 }
                                             ) { Text("试走这条线") }
                                         }
