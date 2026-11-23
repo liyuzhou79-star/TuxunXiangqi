@@ -190,6 +190,46 @@ fun GameRecord.sourceNote(): String {
     return OpeningBook.historyNotation(hist).joinToString(" · ")
 }
 
+/** Whether this record is an unfinished game that can be
+ *  picked up and played on (1.24.0): BoardScreen writes
+ *  "对局进行中" for every mid-game save, and only human games
+ *  can be continued — a spectacle was a show, not a game
+ *  anyone was playing. */
+fun GameRecord.canContinue(): Boolean =
+    resultText == "对局进行中" &&
+        (modeLabel.startsWith("人机对弈") || modeLabel.startsWith("人人对弈"))
+
+/** Rebuilds a resume snapshot from an unfinished record so the
+ *  game can be continued exactly where it stopped: same start
+ *  position, same moves, same level / side / handicap (all
+ *  parsed back out of the mode label BoardScreen wrote) and
+ *  the record's id, so finishing overwrites this record
+ *  instead of leaving a stale unfinished copy behind.
+ *  Records never stored the strength slider or the clock, so
+ *  the caller passes the current settings values and the
+ *  clock restarts full. Null when [canContinue] is false.
+ *  Pinned by RecordContinueTest. */
+fun GameRecord.toResumeGame(strength: Int, clockMinutes: Int): ResumeGame? {
+    if (!canContinue()) return null
+    val ai = modeLabel.startsWith("人机对弈")
+    val segments = modeLabel.split(" · ")
+    return ResumeGame(
+        modeName = if (ai) "AI" else "PVP",
+        levelLabel = if (ai) segments.getOrNull(1) ?: "普通" else "普通",
+        humanSideRed = !ai || modeLabel.contains("执红"),
+        handicapLabel = segments.firstOrNull { it.startsWith("让") } ?: "不让子",
+        strength = strength,
+        clockMinutes = clockMinutes,
+        redMs = clockMinutes * 60_000L,
+        blackMs = clockMinutes * 60_000L,
+        initialFen = initialFen,
+        movesUci = movesUci,
+        evals = evals,
+        savedAtMs = System.currentTimeMillis(),
+        recordId = id
+    )
+}
+
 /** The library screen's filter: mode chip, result chip and a
  *  free-text match on title, result or start-position source.
  *  Result chips match the resultText prefixes BoardScreen

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
+import com.tuxunxiangqi.android.data.canContinue
 import com.tuxunxiangqi.android.data.sourceLabel
 import com.tuxunxiangqi.android.data.sourceNote
 import com.tuxunxiangqi.android.data.toPortableText
@@ -64,7 +66,11 @@ import kotlinx.coroutines.launch
  *  key-move patrol and an engine best-move comparison. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
+fun ReviewScreen(
+    record: GameRecord,
+    onBack: () -> Unit,
+    onContinue: (GameRecord) -> Unit = {}
+) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val engine = remember { PikafishEngine(context) }
@@ -375,6 +381,21 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                     Toast.makeText(context, "局面图生成失败，请再试一次", Toast.LENGTH_SHORT).show()
                 }
             }) { Text("分享棋盘图") }
+        }
+        // An unfinished game can be picked up and played on
+        // from its final position (1.24.0), under the setup it
+        // was saved with; finishing it updates this record.
+        if (liveRecord.canContinue()) {
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { onContinue(liveRecord) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("从这局接着下") }
+            Text(
+                text = "按存谱时的档位、执子与让子接着下；棋力档和棋钟按现在的设置，棋钟重新计时。下完会更新这条棋谱。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         Spacer(Modifier.height(12.dp))
 

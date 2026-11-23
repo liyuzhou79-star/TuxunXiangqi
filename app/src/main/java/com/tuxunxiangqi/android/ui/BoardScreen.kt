@@ -299,7 +299,9 @@ fun BoardScreen(
     }
     val recordStore = remember { RecordStore(context) }
     val resumeStore = remember { ResumeStore(context) }
-    var savedRecordId by remember { mutableStateOf<Long?>(null) }
+    // A game continued from a library record (1.24.0) keeps
+    // that record's id, so saving overwrites it in place.
+    var savedRecordId by remember { mutableStateOf<Long?>(resume?.recordId) }
     var finalSaved by remember { mutableStateOf(false) }
     val rootView = LocalView.current
     var boardPos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
@@ -533,7 +535,8 @@ fun BoardScreen(
         initialFen = Fen.toFen(state.initialCells, state.initialTurn),
         movesUci = state.historyMoves().map { Fen.toUci(it.from, it.to) },
         evals = evalPoints.toMap(),
-        savedAtMs = System.currentTimeMillis()
+        savedAtMs = System.currentTimeMillis(),
+        recordId = resume?.recordId
     )
 
     fun snapshotResume() {

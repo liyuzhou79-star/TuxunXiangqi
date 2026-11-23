@@ -17,6 +17,7 @@ import com.tuxunxiangqi.android.ui.BoardScreen
 import com.tuxunxiangqi.android.ui.HomeScreen
 import com.tuxunxiangqi.android.ui.JiangTheme
 import com.tuxunxiangqi.android.data.GameRecord
+import com.tuxunxiangqi.android.data.toResumeGame
 import com.tuxunxiangqi.android.ui.RecordsScreen
 import com.tuxunxiangqi.android.ui.GuessScreen
 import com.tuxunxiangqi.android.ui.GuideScreen
@@ -151,7 +152,27 @@ class MainActivity : ComponentActivity() {
                         )
                         is Screen.Review -> ReviewScreen(
                             record = s.record,
-                            onBack = { screen = Screen.Records }
+                            onBack = { screen = Screen.Records },
+                            onContinue = { record ->
+                                // Records never stored the strength
+                                // slider or the clock; the current
+                                // settings stand in for both.
+                                val settings = SettingsStore(applicationContext)
+                                val rg = record.toResumeGame(
+                                    settings.strengthLevel,
+                                    settings.defaultClockMinutes
+                                )
+                                if (rg != null) {
+                                    screen = Screen.Board(
+                                        mode = if (rg.modeName == "AI") {
+                                            BoardMode.AI
+                                        } else {
+                                            BoardMode.PVP
+                                        },
+                                        resume = rg
+                                    )
+                                }
+                            }
                         )
                         Screen.Editor -> com.tuxunxiangqi.android.ui.EditorScreen(
                             onBack = { screen = Screen.Home },

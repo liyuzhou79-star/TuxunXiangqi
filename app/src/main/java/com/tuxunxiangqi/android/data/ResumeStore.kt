@@ -22,7 +22,13 @@ data class ResumeGame(
     val initialFen: String,
     val movesUci: List<String>,
     val evals: Map<Int, Int>,
-    val savedAtMs: Long
+    val savedAtMs: Long,
+    /** When this game was continued from a library record
+     *  (1.24.0), the record it came from: finishing the game
+     *  overwrites that record instead of adding a second one.
+     *  Null for games started fresh or snapshotted before the
+     *  field existed. */
+    val recordId: Long? = null
 ) {
     /** Short human summary for the home-screen card. */
     fun summary(): String {
@@ -62,7 +68,8 @@ class ResumeStore(context: Context) {
                 initialFen = o.optString("fen", ""),
                 movesUci = moves,
                 evals = evals,
-                savedAtMs = o.optLong("savedAt", 0L)
+                savedAtMs = o.optLong("savedAt", 0L),
+                recordId = if (o.has("recordId")) o.getLong("recordId") else null
             )
         } catch (_: Exception) {
             null
@@ -88,6 +95,7 @@ class ResumeStore(context: Context) {
             for ((k, v) in game.evals) evals.put(k.toString(), v)
             o.put("evals", evals)
             o.put("savedAt", game.savedAtMs)
+            if (game.recordId != null) o.put("recordId", game.recordId)
             file.writeText(o.toString())
         } catch (_: Exception) {
             // A failed snapshot must never break the game itself.

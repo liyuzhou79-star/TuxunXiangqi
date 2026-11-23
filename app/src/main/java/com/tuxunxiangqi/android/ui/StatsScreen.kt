@@ -96,7 +96,8 @@ fun StatsScreen(onBack: () -> Unit) {
                 )
             } else {
                 Text(
-                    text = "共 " + finished.size + " 局：胜 $wins · 负 $losses · 和 $draws",
+                    text = "共 " + finished.size + " 局：胜 $wins · 负 $losses · 和 $draws" +
+                        " · 胜率 " + (wins * 100 / finished.size) + "%",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -108,6 +109,21 @@ fun StatsScreen(onBack: () -> Unit) {
                         val d = games.count { outcome(it) == "和" }
                         Text(
                             text = "$lv 档：" + games.size + " 局（胜 $w · 负 $l · 和 $d）",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                for ((sideLabel, sideGames) in listOf(
+                    "执红" to finished.filter { it.modeLabel.contains("执红") },
+                    "执黑" to finished.filter { it.modeLabel.contains("执黑") }
+                )) {
+                    if (sideGames.isNotEmpty()) {
+                        val w = sideGames.count { outcome(it) == "胜" }
+                        val l = sideGames.count { outcome(it) == "负" }
+                        val d = sideGames.count { outcome(it) == "和" }
+                        Text(
+                            text = "$sideLabel：" + sideGames.size +
+                                " 局（胜 $w · 负 $l · 和 $d）",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
