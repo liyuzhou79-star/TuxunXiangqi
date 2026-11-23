@@ -151,6 +151,22 @@ fun HomeScreen(
         Spacer(Modifier.height(14.dp))
         // Daily puzzle card.
         val daily = Puzzles.daily(Calendar.getInstance().get(Calendar.DAY_OF_YEAR))
+        // Solved state straight from the puzzle store, so the card
+        // itself says whether today's puzzle is already done
+        // (1.21.0): 0 = not solved, 1 = solved, 2 = solved with a
+        // hint (PuzzleScreen's assisted_<id> flag).
+        val dailyState = remember(daily.id) {
+            val prefs = homeContext.getSharedPreferences(
+                "puzzles", android.content.Context.MODE_PRIVATE
+            )
+            val solved = prefs.getStringSet("solved", emptySet()).orEmpty()
+                .mapNotNull { it.toIntOrNull() }.toSet()
+            when {
+                daily.id !in solved -> 0
+                prefs.getBoolean("assisted_" + daily.id, false) -> 2
+                else -> 1
+            }
+        }
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -170,8 +186,23 @@ fun HomeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
+                if (dailyState > 0) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = if (dailyState == 2) {
+                            "今天这题你已经解出来了（当时用过提示）"
+                        } else {
+                            "今天这题你已经解出来了"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
                 Spacer(Modifier.height(10.dp))
-                OutlinedButton(onClick = onPuzzles) { Text("去解今日一题") }
+                OutlinedButton(onClick = onPuzzles) {
+                    Text(if (dailyState > 0) "再练一次今日一题" else "去解今日一题")
+                }
             }
         }
         Spacer(Modifier.height(14.dp))

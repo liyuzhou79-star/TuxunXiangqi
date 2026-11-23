@@ -152,6 +152,32 @@ fun filterRecords(
     }
 }
 
+/** Library sort orders (1.21.0). "最新在前" is the historical
+ *  default (loadAll already returns date-descending); every
+ *  other order falls back to newest-first on ties so the list
+ *  never reshuffles between visits. Pure: pinned by
+ *  SortRecordsTest. */
+fun sortRecords(records: List<GameRecord>, sort: String): List<GameRecord> =
+    when (sort) {
+        "最早在前" -> records.sortedWith(
+            compareBy<GameRecord> { it.dateMs }.thenBy { it.id }
+        )
+        "手数多到少" -> records.sortedWith(
+            compareByDescending<GameRecord> { it.movesUci.size }
+                .thenByDescending { it.dateMs }
+        )
+        "手数少到多" -> records.sortedWith(
+            compareBy<GameRecord> { it.movesUci.size }
+                .thenByDescending { it.dateMs }
+        )
+        "标题" -> records.sortedWith(
+            compareBy<GameRecord> { it.title }.thenByDescending { it.dateMs }
+        )
+        else -> records.sortedWith(
+            compareByDescending<GameRecord> { it.dateMs }.thenBy { it.id }
+        )
+    }
+
 /** Serialises one record into the portable text format used for
  *  export/import: header lines plus a UCI move line, so a record
  *  can travel by clipboard, share sheet or file. */

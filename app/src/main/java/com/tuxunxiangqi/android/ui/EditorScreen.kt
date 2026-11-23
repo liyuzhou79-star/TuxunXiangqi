@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import android.widget.Toast
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -19,8 +21,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -29,8 +33,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.Piece
 import com.tuxunxiangqi.android.xiangqi.PieceType
@@ -85,12 +93,23 @@ fun EditorScreen(
     onBack: () -> Unit,
     onStart: (List<Piece?>, BoardMode) -> Unit
 ) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     val state = remember { GameState() }
     // null tool = eraser.
     var tool by remember { mutableStateOf<Piece?>(Piece(PieceType.CHARIOT, Side.RED)) }
     var erase by remember { mutableStateOf(false) }
     var version by remember { mutableStateOf(0) }
     val problem = remember(version) { validatePosition(state.cells) }
+    // FEN of the position being edited (the editor always starts
+    // Red to move), plus the paste-a-FEN import dialog state.
+    val fenText = remember(version) { Fen.toFen(state.cells, Side.RED) }
+    var fenImportOpen by remember { mutableStateOf(false) }
+    var fenImportText by remember { mutableStateOf("") }
+
+    fun toast(msg: String) {
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
 
     fun syncFromCells(cells: List<Piece?>) {
         state.loadPosition(cells, Side.RED)
@@ -203,6 +222,52 @@ fun EditorScreen(
                 }
                 Spacer(Modifier.height(12.dp))
             }
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "这个局面的 FEN",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = fenText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow {
+                        OutlinedButton(
+                            onClick = {
+                                clipboard.setText(AnnotatedString(fenText))
+                                toast("FEN 已复制")
+                            },
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) { Text("复制 FEN") }
+                        OutlinedButton(
+                            onClick = { shareText(context, fenText, "将！摆棋局面 FEN") },
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) { Text("分享 FEN") }
+                        OutlinedButton(
+                            onClick = {
+                                fenImportText = ""
+                                fenImportOpen = true
+                            }
+                        ) { Text("粘贴 FEN 摆棋") }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "把 FEN 发给朋友，对方粘贴进来就能摆出同一个局面；从别处抄来的 FEN 也能粘贴进来试下。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = { onStart(state.cells.toList(), BoardMode.PVP) },
@@ -228,6 +293,43 @@ fun EditorScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
+        }
+
+        if (fenImportOpen) {
+            AlertDialog(
+                onDismissRequest = { fenImportOpen = false },
+                title = { Text("粘贴 FEN 摆棋") },
+                text = {
+                    Column {
+                        Text(
+                            text = "把一段 FEN 粘贴进来，棋盘会换成那个局面。编辑器固定红方先行，FEN 里写的轮次不影响开局方。",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = fenImportText,
+                            onValueChange = { fenImportText = it },
+                            minLines = 3,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val parsed = Fen.fromFen(fenImportText)
+                        if (parsed != null) {
+                            syncFromCells(parsed.first)
+                            fenImportOpen = false
+                            toast("已按 FEN 摆好局面")
+                        } else {
+                            toast("没认出这段 FEN，检查一下是不是少行或多了字符")
+                        }
+                    }) { Text("摆棋") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { fenImportOpen = false }) { Text("取消") }
+                }
+            )
         }
     }
 }

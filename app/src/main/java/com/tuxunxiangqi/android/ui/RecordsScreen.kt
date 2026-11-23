@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.data.filterRecords
+import com.tuxunxiangqi.android.data.sortRecords
 import com.tuxunxiangqi.android.data.parsePortableRecords
 import com.tuxunxiangqi.android.data.toPortableText
 import com.tuxunxiangqi.android.data.toPortableTextBundle
@@ -64,6 +65,7 @@ fun RecordsScreen(
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("全部") }
     var resultFilter by remember { mutableStateOf("全部结果") }
+    var sortOrder by remember { mutableStateOf("最新在前") }
     var renameTarget by remember { mutableStateOf<GameRecord?>(null) }
     var renameText by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<GameRecord?>(null) }
@@ -134,8 +136,8 @@ fun RecordsScreen(
         }
     }
 
-    val shown = remember(records, filter, query, resultFilter) {
-        filterRecords(records, filter, query, resultFilter)
+    val shown = remember(records, filter, query, resultFilter, sortOrder) {
+        sortRecords(filterRecords(records, filter, query, resultFilter), sortOrder)
     }
     val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA) }
 
@@ -185,6 +187,16 @@ fun RecordsScreen(
                             selected = resultFilter == f,
                             onClick = { resultFilter = f },
                             label = { Text(f) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (s in listOf("最新在前", "最早在前", "手数多到少", "手数少到多", "标题")) {
+                        FilterChip(
+                            selected = sortOrder == s,
+                            onClick = { sortOrder = s },
+                            label = { Text(s) }
                         )
                     }
                 }
