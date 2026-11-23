@@ -281,6 +281,11 @@ object Puzzles {
             52, "双马车兵胜双象",
             "2b1k1b2/9/2N1P1N2/9/9/9/9/4R4/9/3K5 w - - 0 1",
             "车占中、双马锁宫、兵临城下——铁门栓的架子已经摆好，只差最后一步，自己找出来。"
+        ),
+        Puzzle(
+            53, "车马兵胜双士单象",
+            "3akab2/1N7/4P4/9/9/9/9/3R5/9/3K5 w - - 0 1",
+            "车马兵对双士单象，子力不多但杀已经成形：一步定局，先把那一步找出来。"
         )
     )
 
@@ -324,14 +329,14 @@ object Puzzles {
         43 to "车炮类",
         46 to "马炮类",
         49 to "马炮类", 50 to "车炮类", 51 to "车马类",
-        52 to "双炮双马类"
+        52 to "双炮双马类", 53 to "车马类"
     )
 
     /** 1 = material crush, 2 = standard textbook win,
      *  3 = sparse or patience finish that is easy to throw away. */
     private val difficultyById: Map<Int, Int> = mapOf(
         1 to 1, 16 to 1, 19 to 1, 25 to 1, 28 to 1, 31 to 1,
-        33 to 1, 34 to 1, 38 to 1, 41 to 1, 42 to 1, 47 to 1, 52 to 1,
+        33 to 1, 34 to 1, 38 to 1, 41 to 1, 42 to 1, 47 to 1, 52 to 1, 53 to 1,
         7 to 3, 8 to 3, 18 to 3, 20 to 3, 22 to 3, 40 to 3, 46 to 3
     )
 
