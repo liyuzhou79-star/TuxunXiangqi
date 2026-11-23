@@ -102,7 +102,19 @@ fun PuzzleScreen(onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(14.dp))
-        for (p in Puzzles.all.sortedBy { it.id }) {
+        val sortedPuzzles = Puzzles.all.sortedBy { it.id }
+        for (category in Puzzles.categoryOrder) {
+            val group = sortedPuzzles.filter { Puzzles.categoryOf(it.id) == category }
+            if (group.isEmpty()) continue
+            val groupSolved = group.count { it.id in solvedIds }
+            Text(
+                text = category + " · " + group.size + " 题" +
+                    if (groupSolved > 0) "（已解 $groupSolved）" else "",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(8.dp))
+            for (p in group) {
             val solved = p.id in solvedIds
             Card(
                 colors = CardDefaults.cardColors(
@@ -117,6 +129,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = (if (p.id == daily.id) "今日一题 · " else "") + p.title +
+                            " · 难度 " + "★".repeat(Puzzles.difficultyOf(p.id)) +
                             if (solved) "（已解出）" else "",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
@@ -146,6 +159,8 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(10.dp))
+            }
+            Spacer(Modifier.height(8.dp))
         }
         OutlinedButton(onClick = onBack) { Text("返回") }
         Spacer(Modifier.height(24.dp))
@@ -219,7 +234,7 @@ private fun PuzzlePlay(
             if (gs.result!!.winner == Side.RED) {
                 solved = true
                 onSolved(puzzle.id, userMoves)
-                SoundFx.play(context, SoundKind.WIN)
+                SoundFx.play(context, SoundKind.MATE_VOICE)
                 status = solvedStatus()
             } else {
                 status = "这局没解出来（" + gs.result!!.reason + "）。悔棋或重开再试。"
@@ -254,7 +269,7 @@ private fun PuzzlePlay(
                         if (gs.result != null && gs.result!!.winner == Side.RED) {
                             solved = true
                             onSolved(puzzle.id, userMoves)
-                            SoundFx.play(context, SoundKind.WIN)
+                            SoundFx.play(context, SoundKind.MATE_VOICE)
                             status = solvedStatus()
                         }
                     }

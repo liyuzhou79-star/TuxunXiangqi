@@ -300,7 +300,12 @@ fun BoardScreen(
     }
     var strength by remember { mutableStateOf(settingsStore.strengthLevel) }
     var handicap by remember { mutableStateOf(Handicap.NONE) }
-    var specSpeed by remember { mutableStateOf(SpecSpeed.MID) }
+    var specSpeed by remember {
+        mutableStateOf(
+            SpecSpeed.values().firstOrNull { it.label == settingsStore.specSpeedLabel }
+                ?: SpecSpeed.MID
+        )
+    }
     var spectaclePaused by remember { mutableStateOf(false) }
     // Clock.
     var clockMinutes by remember { mutableStateOf(settingsStore.defaultClockMinutes) }
@@ -478,6 +483,10 @@ fun BoardScreen(
         val res = state.result ?: return@LaunchedEffect
         when {
             res.winner == null -> SoundFx.play(context, SoundKind.DRAW)
+            // A real mate finish gets the human checkmate shout
+            // (resign / timeout / agreed endings keep win-lose).
+            res.reason == "将死" || res.reason == "困毙" ->
+                SoundFx.play(context, SoundKind.MATE_VOICE)
             mode == BoardMode.AI ->
                 SoundFx.play(
                     context,
@@ -763,7 +772,10 @@ fun BoardScreen(
                     )
                     BoardMode.SPECTACLE -> SetupSpectacleSection(
                         specSpeed = specSpeed,
-                        onSpeedChange = { specSpeed = it },
+                        onSpeedChange = {
+                            specSpeed = it
+                            settingsStore.specSpeedLabel = it.label
+                        },
                         onStart = {
                             setupDone = true
                             engine.start(onReady = {}, onError = { msg -> engineError = msg })

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tuxunxiangqi.android.data.GuessStatsStore
 import com.tuxunxiangqi.android.data.Puzzles
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.data.WrongBookStore
@@ -35,6 +36,8 @@ fun StatsScreen(onBack: () -> Unit) {
         context.getSharedPreferences("puzzles", Context.MODE_PRIVATE)
             .getStringSet("solved", emptySet()).orEmpty().size
     }
+    val guessStats = remember { GuessStatsStore(context) }
+    val guessTotal = remember { guessStats.total() }
 
     val aiGames = records.filter { it.modeLabel.startsWith("人机对弈") }
     fun outcome(r: com.tuxunxiangqi.android.data.GameRecord): String {
@@ -135,6 +138,29 @@ fun StatsScreen(onBack: () -> Unit) {
                 text = "错题本里还有 $wrongCount 道题等着重练",
                 style = MaterialTheme.typography.bodyMedium
             )
+            if (guessTotal.asked > 0) {
+                Text(
+                    text = "猜一选累计答题 " + guessTotal.asked + " 题：命中一选 " +
+                        guessTotal.bestHits + " 次（一选命中率 " + guessTotal.bestRatePercent +
+                        "%）· 进前四 " + guessTotal.top4 + " 次",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                for (bucket in listOf("简单", "普通", "困难")) {
+                    val s = guessStats.stat(bucket)
+                    if (s.asked > 0) {
+                        Text(
+                            text = "$bucket 档：答 " + s.asked + " 题，命中一选 " + s.bestHits +
+                                " 次（" + s.bestRatePercent + "%）",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "猜一选还没有答过题，去训练里猜几题，这里会记下你的一选命中率。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
 
         OutlinedButton(onClick = onBack) { Text("返回") }

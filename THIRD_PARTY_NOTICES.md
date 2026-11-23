@@ -53,11 +53,23 @@ no other changes were made. The remaining short cues (check, and
 the guess-game ticks) are synthesized in code by this application
 and are not third-party material.
 
-A note on voice announcements: a human-voice "check!" call was
-searched for across the open-source projects above and other
-license-clear sources, but no recording with a clear license could
-be verified (the candidate packs turned out to be synthesized
-tones, confirmed by transcription and spectral checks). Rather
-than ship a text-to-speech voice, the check cue stays a short
-synthesized chime until a properly licensed human recording turns
-up.
+## Checkmate voice shout — chinese-chess-fish-android
+
+The human voice clip played when a game ends by checkmate or
+stalemate (`app/src/main/res/raw/snd_checkmate_voice.mp3`) comes
+from **chinese-chess-fish-android** by zfdang:
+https://github.com/zfdang/chinese-chess-fish-android
+Licensed under the MIT License. The clip was verified to be a
+genuine human recording (speech transcription plus spectral /
+formant analysis) before inclusion; it was trimmed of silence,
+loudness-normalised and re-encoded, with no change to the voice
+itself.
+
+A note on voice announcements: a human-voice "check!" call is
+still being searched for across license-clear open-source
+projects. Every candidate "check" clip verified so far —
+including the one in the project above — turned out to be a
+synthesized tone (confirmed by transcription and spectral
+checks). Rather than ship a text-to-speech voice, the check cue
+stays a short synthesized chime until a properly licensed human
+recording turns up.

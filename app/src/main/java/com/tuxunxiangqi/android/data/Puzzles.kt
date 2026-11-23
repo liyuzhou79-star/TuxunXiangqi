@@ -183,6 +183,40 @@ object Puzzles {
 
     /** The daily puzzle: stable within a day, rotates over the set. */
     fun daily(dayOfYear: Int): Puzzle = all.sortedBy { it.id }[dayOfYear % all.size]
+
+    /** Display grouping by the lead attacking material, in the
+     *  order the list page shows them. */
+    val categoryOrder: List<String> =
+        listOf("双车类", "车马类", "车炮类", "车兵类", "马炮类", "双炮双马类")
+
+    private val categoryById: Map<Int, String> = mapOf(
+        1 to "双车类", 16 to "双车类", 25 to "双车类", 28 to "双车类", 31 to "双车类",
+        3 to "车马类", 11 to "车马类", 19 to "车马类", 29 to "车马类", 32 to "车马类",
+        9 to "车炮类", 17 to "车炮类", 24 to "车炮类", 26 to "车炮类",
+        4 to "车兵类", 5 to "车兵类", 8 to "车兵类", 13 to "车兵类",
+        15 to "车兵类", 20 to "车兵类", 21 to "车兵类", 30 to "车兵类",
+        2 to "马炮类", 7 to "马炮类", 10 to "马炮类", 12 to "马炮类",
+        14 to "马炮类", 23 to "马炮类",
+        6 to "双炮双马类", 18 to "双炮双马类", 22 to "双炮双马类", 27 to "双炮双马类"
+    )
+
+    /** 1 = material crush, 2 = standard textbook win,
+     *  3 = sparse or patience finish that is easy to throw away. */
+    private val difficultyById: Map<Int, Int> = mapOf(
+        1 to 1, 16 to 1, 19 to 1, 25 to 1, 28 to 1, 31 to 1,
+        7 to 3, 8 to 3, 18 to 3, 20 to 3, 22 to 3
+    )
+
+    fun categoryOf(id: Int): String = categoryById[id] ?: "综合类"
+
+    fun difficultyOf(id: Int): Int = difficultyById[id] ?: 2
+
+    /** Ids lacking an explicit category entry — the unit test
+     *  pins this to empty so a new puzzle can never silently land
+     *  in the fallback bucket. (Difficulty defaults to 2 by
+     *  design; only the extremes are listed.) */
+    fun idsWithoutCategory(): Set<Int> =
+        all.map { it.id }.filter { it !in categoryById }.toSet()
 }
 
 /** Curated positions for the guess-the-best-move trainer, grouped

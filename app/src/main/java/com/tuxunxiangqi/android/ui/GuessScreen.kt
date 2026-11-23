@@ -30,7 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tuxunxiangqi.android.data.GuessOutcome
 import com.tuxunxiangqi.android.data.GuessPositions
+import com.tuxunxiangqi.android.data.GuessStatsStore
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.data.WrongBookStore
 import com.tuxunxiangqi.android.data.WrongEntry
@@ -59,6 +61,7 @@ fun GuessScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) { engine.start({}, {}) }
     val wrongStore = remember { WrongBookStore(context) }
     val recordStore = remember { RecordStore(context) }
+    val statsStore = remember { GuessStatsStore(context) }
 
     var source by remember { mutableStateOf("普通") }
     val gs = remember { GameState() }
@@ -166,6 +169,7 @@ fun GuessScreen(onBack: () -> Unit) {
     fun judge(guess: Pair<Pos, Pos>?) {
         if (busy || revealed) return
         busy = true
+        val bucketNow = source
         val guessUci = guess?.let { Fen.toUci(it.first, it.second) }
         val fenNow = Fen.toFen(gs)
         val cellsNow = gs.cells.toList()
@@ -184,6 +188,14 @@ fun GuessScreen(onBack: () -> Unit) {
             asked++
             revealed = true
             val guessRank = cands.firstOrNull { it.moveUci == guessUci }?.rank
+            statsStore.record(
+                bucketNow,
+                when {
+                    guessUci == best.moveUci -> GuessOutcome.BEST
+                    guessRank != null -> GuessOutcome.TOP4
+                    else -> GuessOutcome.MISS
+                }
+            )
             val guessText = guess?.let { Notation.moveText(cellsNow, it.first, it.second) }
             val bestText = Fen.parseUciMove(best.moveUci)?.let {
                 Notation.moveText(cellsNow, it.first, it.second)
@@ -309,6 +321,15 @@ fun GuessScreen(onBack: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )
+        val lifetime = remember(asked) { statsStore.total() }
+        if (lifetime.asked > 0) {
+            Text(
+                text = "累计成绩：共答 " + lifetime.asked + " 题 · 命中一选 " + lifetime.bestHits +
+                    " 次（" + lifetime.bestRatePercent + "%）· 进前四 " + lifetime.top4 + " 次",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         if (timed && !revealed && currentFen.isNotBlank()) {
             Text(
                 text = "还剩 $secondsLeft 秒",

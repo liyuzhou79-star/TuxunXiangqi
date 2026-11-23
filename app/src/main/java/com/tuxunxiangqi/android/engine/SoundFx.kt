@@ -13,17 +13,20 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.random.Random
 
-enum class SoundKind { MOVE, CAPTURE, CHECK, WIN, LOSE, DRAW, GOOD, BAD }
+enum class SoundKind { MOVE, CAPTURE, CHECK, WIN, LOSE, DRAW, GOOD, BAD, MATE_VOICE }
 
 /** In-game sounds. Move, capture, win, lose and draw use real
  *  recorded clips bundled in res/raw (from the open-source
  *  ChessRoad project, GPL-3.0 — see THIRD_PARTY_NOTICES.md),
- *  played through MediaPlayer. The remaining cues (check, and
- *  the small guess-game ticks) fall back to the original
- *  code-synthesized PCM tones, which also serve as the fallback
- *  if a clip ever fails to play. Gated by the user's sound
- *  setting; every failure is swallowed so a sound problem can
- *  never break a game. */
+ *  played through MediaPlayer. MATE_VOICE is a real human
+ *  checkmate shout (from the MIT-licensed chinese-chess-fish
+ *  project, verified as a genuine voice recording by
+ *  transcription + spectral analysis — see the checkpoint).
+ *  The remaining cues (check, and the small guess-game ticks)
+ *  fall back to the original code-synthesized PCM tones, which
+ *  also serve as the fallback if a clip ever fails to play.
+ *  Gated by the user's sound setting; every failure is
+ *  swallowed so a sound problem can never break a game. */
 object SoundFx {
 
     private const val RATE = 44100
@@ -34,6 +37,7 @@ object SoundFx {
         SoundKind.WIN -> R.raw.snd_win
         SoundKind.LOSE -> R.raw.snd_lose
         SoundKind.DRAW -> R.raw.snd_draw
+        SoundKind.MATE_VOICE -> R.raw.snd_checkmate_voice
         else -> null
     }
 
@@ -154,6 +158,12 @@ object SoundFx {
                 Seg(990.0, 90, vol = 0.45),
                 Seg(0.0, 60),
                 Seg(990.0, 110, vol = 0.45)
+            )
+            // Fallback only — the real cue is the human shout.
+            SoundKind.MATE_VOICE -> listOf(
+                Seg(523.0, 120, vol = 0.5),
+                Seg(659.0, 120, vol = 0.5),
+                Seg(784.0, 200, vol = 0.55)
             )
             SoundKind.WIN -> listOf(
                 Seg(523.0, 120, vol = 0.5),

@@ -50,6 +50,18 @@ class PuzzleFenTest {
     }
 
     @Test
+    fun everyPuzzleHasCategoryAndSaneDifficulty() {
+        assertTrue(
+            "puzzles without category: " + Puzzles.idsWithoutCategory(),
+            Puzzles.idsWithoutCategory().isEmpty()
+        )
+        for (p in Puzzles.all) {
+            assertTrue(Puzzles.categoryOf(p.id) in Puzzles.categoryOrder)
+            assertTrue(Puzzles.difficultyOf(p.id) in 1..3)
+        }
+    }
+
+    @Test
     fun allGuessFensAreSane() {
         for ((_, fen) in GuessPositions.easy + GuessPositions.normal + GuessPositions.hard) {
             checkFen(fen)

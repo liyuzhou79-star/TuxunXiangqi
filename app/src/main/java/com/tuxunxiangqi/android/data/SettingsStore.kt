@@ -40,6 +40,12 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("strengthLevel", 5).coerceIn(1, 10)
         set(value) = prefs.edit().putInt("strengthLevel", value.coerceIn(1, 10)).apply()
 
+    /** Remembered spectacle (AI vs AI) speed label, so the show
+     *  reopens at the pace the user last picked. */
+    var specSpeedLabel: String
+        get() = prefs.getString("specSpeed", "中速") ?: "中速"
+        set(value) = prefs.edit().putString("specSpeed", value).apply()
+
     /** Safety colours on the selected piece's legal targets:
      *  green = the piece survives there, red = it would be taken
      *  （送死）, green ring = a capture that cannot be answered,
@@ -66,6 +72,7 @@ class SettingsStore(context: Context) {
         o.put("soundOn", soundOn)
         o.put("safetyHintsOn", safetyHintsOn)
         o.put("strengthLevel", strengthLevel)
+        o.put("specSpeed", specSpeedLabel)
         return o
     }
 
@@ -79,6 +86,8 @@ class SettingsStore(context: Context) {
         // current value then (optBoolean falls back to it).
         safetyHintsOn = o.optBoolean("safetyHintsOn", safetyHintsOn)
         strengthLevel = o.optInt("strengthLevel", strengthLevel)
+        // Older backups have no specSpeed key: keep current then.
+        specSpeedLabel = o.optString("specSpeed", specSpeedLabel)
     }
 }
 
