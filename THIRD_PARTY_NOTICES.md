@@ -49,8 +49,8 @@ The recorded clips for move, capture, win, lose and draw
 https://github.com/hezhaoyun/chessroad-lite
 Licensed under GPL-3.0, the same license as this application.
 The clips were trimmed of trailing silence and loudness-normalised;
-no other changes were made. The remaining short cues (check, and
-the guess-game ticks) are synthesized in code by this application
+no other changes were made. The remaining short cues (the
+guess-game ticks) are synthesized in code by this application
 and are not third-party material.
 
 ## Checkmate voice shout — chinese-chess-fish-android
@@ -65,11 +65,18 @@ formant analysis) before inclusion; it was trimmed of silence,
 loudness-normalised and re-encoded, with no change to the voice
 itself.
 
-A note on voice announcements: a human-voice "check!" call is
-still being searched for across license-clear open-source
-projects. Every candidate "check" clip verified so far —
-including the one in the project above — turned out to be a
-synthesized tone (confirmed by transcription and spectral
-checks). Rather than ship a text-to-speech voice, the check cue
-stays a short synthesized chime until a properly licensed human
-recording turns up.
+## Check voice call — WatchChess
+
+The human voice clip played whenever a move gives check
+(`app/src/main/res/raw/snd_check_voice.mp3`) comes from
+**WatchChess** by yingwang:
+https://github.com/yingwang/WatchChess
+Licensed under GPL-3.0, the same license as this application.
+The clip was verified to be a genuine human recording before
+inclusion: speech transcription (Whisper, two model sizes)
+reads it as an unambiguous "将军" (check), its fundamental
+frequency wanders naturally (roughly 120–195 Hz, adult male),
+and its spectrum shows the irregular harmonic / formant
+structure of a real shouted voice — unlike the flat synthesized
+tones rejected in earlier searches. It was loudness-normalised
+and re-encoded, with no change to the voice itself.

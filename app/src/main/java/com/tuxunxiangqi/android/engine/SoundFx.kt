@@ -13,7 +13,7 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.random.Random
 
-enum class SoundKind { MOVE, CAPTURE, CHECK, WIN, LOSE, DRAW, GOOD, BAD, MATE_VOICE, TICK }
+enum class SoundKind { MOVE, CAPTURE, CHECK, CHECK_VOICE, WIN, LOSE, DRAW, GOOD, BAD, MATE_VOICE, TICK }
 
 /** In-game sounds. Move, capture, win, lose and draw use real
  *  recorded clips bundled in res/raw (from the open-source
@@ -22,9 +22,12 @@ enum class SoundKind { MOVE, CAPTURE, CHECK, WIN, LOSE, DRAW, GOOD, BAD, MATE_VO
  *  checkmate shout (from the MIT-licensed chinese-chess-fish
  *  project, verified as a genuine voice recording by
  *  transcription + spectral analysis — see the checkpoint).
- *  The remaining cues (check, and the small guess-game ticks)
- *  fall back to the original code-synthesized PCM tones, which
- *  also serve as the fallback if a clip ever fails to play.
+ *  CHECK_VOICE is likewise a real human voice calling "check"
+ *  (from the GPL-3.0 WatchChess project, verified the same
+ *  way — see THIRD_PARTY_NOTICES.md). The remaining cues (the
+ *  small guess-game ticks) fall back to the original
+ *  code-synthesized PCM tones, which also serve as the
+ *  fallback if a clip ever fails to play.
  *  Gated by the user's sound setting; every failure is
  *  swallowed so a sound problem can never break a game. */
 object SoundFx {
@@ -38,6 +41,7 @@ object SoundFx {
         SoundKind.LOSE -> R.raw.snd_lose
         SoundKind.DRAW -> R.raw.snd_draw
         SoundKind.MATE_VOICE -> R.raw.snd_checkmate_voice
+        SoundKind.CHECK_VOICE -> R.raw.snd_check_voice
         else -> null
     }
 
@@ -154,7 +158,9 @@ object SoundFx {
                 Seg(0.0, 50),
                 Seg(110.0, 90, knock = true, vol = 0.7)
             )
-            SoundKind.CHECK -> listOf(
+            // CHECK_VOICE shares this synth rendering as its
+            // fallback only — the real cue is the human call.
+            SoundKind.CHECK, SoundKind.CHECK_VOICE -> listOf(
                 Seg(990.0, 90, vol = 0.45),
                 Seg(0.0, 60),
                 Seg(990.0, 110, vol = 0.45)

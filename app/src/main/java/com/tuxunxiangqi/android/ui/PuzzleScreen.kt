@@ -257,7 +257,7 @@ private fun PuzzlePlay(
             SoundFx.play(
                 context,
                 when {
-                    gs.inCheck -> SoundKind.CHECK
+                    gs.inCheck -> SoundKind.CHECK_VOICE
                     mv.captured != null -> SoundKind.CAPTURE
                     else -> SoundKind.MOVE
                 }

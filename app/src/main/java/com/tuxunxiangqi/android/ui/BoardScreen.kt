@@ -555,7 +555,7 @@ fun BoardScreen(
             SoundFx.play(
                 context,
                 when {
-                    state.inCheck -> SoundKind.CHECK
+                    state.inCheck -> SoundKind.CHECK_VOICE
                     mv.captured != null -> SoundKind.CAPTURE
                     else -> SoundKind.MOVE
                 }
