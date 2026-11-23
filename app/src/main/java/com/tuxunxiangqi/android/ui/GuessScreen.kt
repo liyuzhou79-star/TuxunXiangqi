@@ -170,6 +170,9 @@ fun GuessScreen(onBack: () -> Unit) {
         if (busy || revealed) return
         busy = true
         val bucketNow = source
+        // Timed answers are accounted in their own bucket, not
+        // mixed into the source's untimed record (since 1.8.0).
+        val timedNow = timed
         val guessUci = guess?.let { Fen.toUci(it.first, it.second) }
         val fenNow = Fen.toFen(gs)
         val cellsNow = gs.cells.toList()
@@ -189,7 +192,7 @@ fun GuessScreen(onBack: () -> Unit) {
             revealed = true
             val guessRank = cands.firstOrNull { it.moveUci == guessUci }?.rank
             statsStore.record(
-                bucketNow,
+                if (timedNow) GuessStatsStore.TIMED_BUCKET else bucketNow,
                 when {
                     guessUci == best.moveUci -> GuessOutcome.BEST
                     guessRank != null -> GuessOutcome.TOP4
@@ -326,6 +329,16 @@ fun GuessScreen(onBack: () -> Unit) {
             Text(
                 text = "累计成绩：共答 " + lifetime.asked + " 题 · 命中一选 " + lifetime.bestHits +
                     " 次（" + lifetime.bestRatePercent + "%）· 进前四 " + lifetime.top4 + " 次",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        val timedLifetime = remember(asked) { statsStore.timedStat() }
+        if (timedLifetime.asked > 0) {
+            Text(
+                text = "限时挑战累计：共答 " + timedLifetime.asked + " 题 · 命中一选 " +
+                    timedLifetime.bestHits + " 次（" + timedLifetime.bestRatePercent +
+                    "%）· 进前四 " + timedLifetime.top4 + " 次",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

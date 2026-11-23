@@ -32,10 +32,12 @@ fun StatsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val records = remember { RecordStore(context).loadAll() }
     val wrongCount = remember { WrongBookStore(context).loadAll().size }
-    val solvedCount = remember {
+    val solvedIds = remember {
         context.getSharedPreferences("puzzles", Context.MODE_PRIVATE)
-            .getStringSet("solved", emptySet()).orEmpty().size
+            .getStringSet("solved", emptySet()).orEmpty()
+            .mapNotNull { it.toIntOrNull() }.toSet()
     }
+    val solvedCount = solvedIds.size
     val guessStats = remember { GuessStatsStore(context) }
     val guessTotal = remember { guessStats.total() }
 
@@ -134,6 +136,17 @@ fun StatsScreen(onBack: () -> Unit) {
                 text = "残局题解出 $solvedCount / " + Puzzles.all.size + " 题",
                 style = MaterialTheme.typography.bodyMedium
             )
+            for (cat in Puzzles.categoryOrder) {
+                val inCat = Puzzles.all.filter { Puzzles.categoryOf(it.id) == cat }
+                if (inCat.isNotEmpty()) {
+                    val done = inCat.count { it.id in solvedIds }
+                    Text(
+                        text = "$cat 类：已解 $done / " + inCat.size + " 题",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             Text(
                 text = "错题本里还有 $wrongCount 道题等着重练",
                 style = MaterialTheme.typography.bodyMedium
@@ -158,6 +171,15 @@ fun StatsScreen(onBack: () -> Unit) {
             } else {
                 Text(
                     text = "猜一选还没有答过题，去训练里猜几题，这里会记下你的一选命中率。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            val timedStat = guessStats.timedStat()
+            if (timedStat.asked > 0) {
+                Text(
+                    text = "限时挑战单列：答 " + timedStat.asked + " 题，命中一选 " +
+                        timedStat.bestHits + " 次（一选命中率 " + timedStat.bestRatePercent +
+                        "%）· 进前四 " + timedStat.top4 + " 次",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

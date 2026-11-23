@@ -13,6 +13,9 @@ data class GuessStat(val asked: Int = 0, val bestHits: Int = 0, val top4: Int = 
 
 /** Persistent guess-the-best-move statistics, bucketed by the
  *  trainer's source labels （简单/普通/困难/我的棋谱/错题本）.
+ *  Timed-mode questions are accounted separately under
+ *  [TIMED_BUCKET] (since 1.8.0), so the per-source numbers stay
+ *  untimed-only and the timed record stands on its own line.
  *  Stored apart from the settings file, so resetting settings
  *  does not erase training history. */
 class GuessStatsStore(context: Context) {
@@ -52,7 +55,15 @@ class GuessStatsStore(context: Context) {
         return GuessStat(asked, best, top4)
     }
 
+    /** The separately-accounted timed-challenge record. */
+    fun timedStat(): GuessStat = stat(TIMED_BUCKET)
+
     companion object {
         val BUCKETS: List<String> = listOf("简单", "普通", "困难", "我的棋谱", "错题本")
+
+        /** Bucket for questions answered under the 30-second
+         *  timed mode; kept out of [BUCKETS] on purpose so the
+         *  source totals stay untimed-only. */
+        const val TIMED_BUCKET = "限时挑战"
     }
 }
