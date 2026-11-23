@@ -11,6 +11,35 @@ data class GuessStat(val asked: Int = 0, val bestHits: Int = 0, val top4: Int = 
         get() = if (asked == 0) 0 else bestHits * 100 / asked
 }
 
+/** Portable form of the whole guess-stats table for the data
+ *  backup (1.22.0): "简单=12,5,4;普通=…" — per bucket
+ *  asked,bestHits,top4, buckets in canonical order. */
+fun encodeGuessStats(stats: Map<String, GuessStat>): String =
+    (GuessStatsStore.BUCKETS + GuessStatsStore.TIMED_BUCKET).mapNotNull { b ->
+        stats[b]?.let { "$b=${it.asked},${it.bestHits},${it.top4}" }
+    }.joinToString(";")
+
+/** Parses [encodeGuessStats] output back. Unknown buckets and
+ *  malformed entries are skipped; null when nothing in the
+ *  text is recognisable, so a corrupt backup line never wipes
+ *  the current table. */
+fun parseGuessStats(text: String): Map<String, GuessStat>? {
+    val known = GuessStatsStore.BUCKETS + GuessStatsStore.TIMED_BUCKET
+    val out = mutableMapOf<String, GuessStat>()
+    for (part in text.trim().split(';')) {
+        val eq = part.indexOf('=')
+        if (eq <= 0) continue
+        val bucket = part.substring(0, eq).trim()
+        if (bucket !in known) continue
+        val nums = part.substring(eq + 1).split(',')
+            .map { it.trim().toIntOrNull() }
+        if (nums.size == 3 && nums.all { it != null }) {
+            out[bucket] = GuessStat(nums[0]!!, nums[1]!!, nums[2]!!)
+        }
+    }
+    return out.ifEmpty { null }
+}
+
 /** Persistent guess-the-best-move statistics, bucketed by the
  *  trainer's source labels （简单/普通/困难/我的棋谱/错题本）.
  *  Timed-mode questions are accounted separately under
@@ -57,6 +86,22 @@ class GuessStatsStore(context: Context) {
 
     /** The separately-accounted timed-challenge record. */
     fun timedStat(): GuessStat = stat(TIMED_BUCKET)
+
+    /** Every bucket's counters, timed included (backup, 1.22.0). */
+    fun allStats(): Map<String, GuessStat> =
+        (BUCKETS + TIMED_BUCKET).associateWith { stat(it) }
+
+    /** Replaces every bucket's counters (backup restore). */
+    fun replaceAll(stats: Map<String, GuessStat>) {
+        val e = prefs.edit()
+        for (b in BUCKETS + TIMED_BUCKET) {
+            val s = stats[b] ?: GuessStat()
+            e.putInt("asked_$b", s.asked)
+            e.putInt("best_$b", s.bestHits)
+            e.putInt("top4_$b", s.top4)
+        }
+        e.apply()
+    }
 
     companion object {
         val BUCKETS: List<String> = listOf("简单", "普通", "困难", "我的棋谱", "错题本")

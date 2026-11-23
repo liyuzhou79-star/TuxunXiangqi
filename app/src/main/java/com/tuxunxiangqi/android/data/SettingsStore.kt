@@ -91,8 +91,10 @@ class SettingsStore(context: Context) {
     }
 }
 
-/** Full data backup: records + wrong book + settings in one JSON
- *  document. Engine files are not included (they ship in the APK). */
+/** Full data backup: records + wrong book + settings + training
+ *  progress (puzzle solves and guess statistics, since 1.22.0)
+ *  in one JSON document. Engine files are not included (they
+ *  ship in the APK). */
 fun buildBackupJson(context: Context): String {
     val root = JSONObject()
     root.put("app", "jiang-xiangqi-backup")
@@ -131,6 +133,8 @@ fun buildBackupJson(context: Context): String {
     }
     root.put("wrongbook", wrongArr)
     root.put("settings", SettingsStore(context).toJson())
+    root.put("puzzles", PuzzleProgressStore(context).load().encode())
+    root.put("guessStats", encodeGuessStats(GuessStatsStore(context).allStats()))
     return root.toString()
 }
 
@@ -194,6 +198,24 @@ fun applyBackupJson(context: Context, text: String): String? {
     }
     WrongBookStore(context).replaceAll(wrong.filter { it.fen.isNotBlank() })
     root.optJSONObject("settings")?.let { SettingsStore(context).applyJson(it) }
+    // Training progress (1.22.0): only touched when the backup
+    // actually carries it — backups from older versions have no
+    // such keys and must not wipe progress made on this device.
+    var progressNote = ""
+    val puzzleText = root.optString("puzzles")
+    if (puzzleText.isNotBlank()) {
+        parsePuzzleProgress(puzzleText)?.let { p ->
+            PuzzleProgressStore(context).replaceAll(p)
+            progressNote = "，残局进度 " + p.solvedIds.size + " 题"
+        }
+    }
+    val guessText = root.optString("guessStats")
+    if (guessText.isNotBlank()) {
+        parseGuessStats(guessText)?.let { g ->
+            GuessStatsStore(context).replaceAll(g)
+            progressNote += "，猜一选统计"
+        }
+    }
     return "恢复完成：棋谱 " + records.size + " 局，错题 " + wrong.size +
-        " 道，设置已覆盖。主题若有变化，回到首页即可看到。"
+        " 道，设置已覆盖" + progressNote + "。主题若有变化，回到首页即可看到。"
 }

@@ -311,7 +311,7 @@ fun SettingsScreen(
             Text("备份与恢复", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "备份包含全部棋谱、错题本和设置（不含引擎文件）。恢复会覆盖当前数据，先导出一份更稳妥。",
+                text = "备份包含全部棋谱、错题本、设置和训练进度（残局解题进度、猜一选统计，不含引擎文件）。恢复会覆盖当前数据，先导出一份更稳妥。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

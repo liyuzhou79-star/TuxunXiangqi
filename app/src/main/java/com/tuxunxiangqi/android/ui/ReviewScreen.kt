@@ -2,6 +2,7 @@ package com.tuxunxiangqi.android.ui
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -33,8 +34,11 @@ import androidx.compose.runtime.setValue
 import android.widget.Toast
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.drawToBitmap
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -102,6 +106,11 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     // Hoisted so the move list at the bottom of the page can
     // scroll back to the board after a jump (1.17.0).
     val pageScroll = rememberScrollState()
+    // Board screenshot plumbing for 分享棋盘图 (1.22.0), the same
+    // capture-and-crop path the live game page uses.
+    val rootView = LocalView.current
+    var boardPos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var boardSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
     var compareText by remember { mutableStateOf<String?>(null) }
     var compareBusy by remember { mutableStateOf(false) }
 
@@ -348,6 +357,19 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
             OutlinedButton(onClick = {
                 shareText(context, liveRecord.toPortableText(), liveRecord.title)
             }) { Text("分享这局") }
+            OutlinedButton(onClick = {
+                try {
+                    val full = rootView.drawToBitmap()
+                    val x = boardPos.x.toInt().coerceIn(0, full.width - 1)
+                    val y = boardPos.y.toInt().coerceIn(0, full.height - 1)
+                    val w = boardSize.width.coerceAtMost(full.width - x)
+                    val h = boardSize.height.coerceAtMost(full.height - y)
+                    val cropped = android.graphics.Bitmap.createBitmap(full, x, y, w, h)
+                    shareBitmap(context, cropped, "将！复盘局面图")
+                } catch (_: Exception) {
+                    Toast.makeText(context, "局面图生成失败，请再试一次", Toast.LENGTH_SHORT).show()
+                }
+            }) { Text("分享棋盘图") }
         }
         Spacer(Modifier.height(12.dp))
 
@@ -363,18 +385,25 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
             it.rank == deepSelectedRank
         } ?: deepNow?.candidates?.firstOrNull()
 
-        BoardFrame(modifier = Modifier.fillMaxWidth()) {
-            XiangqiBoard(
-                state = if (trialCand != null) deepTrialState else displayState,
-                selected = null,
-                legalTargets = emptyList(),
-                hint = if (trialCand != null) {
-                    trialNextHint
-                } else {
-                    selectedCand?.let { Fen.parseUciMove(it.moveUci) }
-                },
-                onTap = {}
-            )
+        Box(
+            modifier = Modifier.onGloballyPositioned { coords ->
+                boardPos = coords.positionInWindow()
+                boardSize = coords.size
+            }
+        ) {
+            BoardFrame(modifier = Modifier.fillMaxWidth()) {
+                XiangqiBoard(
+                    state = if (trialCand != null) deepTrialState else displayState,
+                    selected = null,
+                    legalTargets = emptyList(),
+                    hint = if (trialCand != null) {
+                        trialNextHint
+                    } else {
+                        selectedCand?.let { Fen.parseUciMove(it.moveUci) }
+                    },
+                    onTap = {}
+                )
+            }
         }
 
         if (trialCand != null) {
