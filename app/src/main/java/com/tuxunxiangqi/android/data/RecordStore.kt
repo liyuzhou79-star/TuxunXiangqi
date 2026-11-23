@@ -303,8 +303,9 @@ fun GameRecord.toResumeGame(strength: Int, clockMinutes: Int): ResumeGame? {
     )
 }
 
-/** The library screen's filter: mode chip, result chip and a
- *  free-text match on title, result or start-position source.
+/** The library screen's filter: mode chip, result chip,
+ *  start-position source (1.36.0, matched against sourceLabel)
+ *  and a free-text match on title, result or source.
  *  Result chips match the resultText prefixes BoardScreen
  *  writes ("红方胜 · …", "黑方胜 · …", "和棋 · …"); "未分胜负"
  *  keeps the rest (mid-game saves and result-less finishes).
@@ -316,7 +317,8 @@ fun filterRecords(
     filter: String,
     query: String,
     result: String = "全部结果",
-    deepOnly: Boolean = false
+    deepOnly: Boolean = false,
+    source: String = "全部来源"
 ): List<GameRecord> {
     val q = query.trim()
     return records.filter { r ->
@@ -328,6 +330,7 @@ fun filterRecords(
             else -> r.resultText.startsWith(result)
         }
         (filter == "全部" || r.modeLabel.startsWith(filter)) && resultOk &&
+            (source == "全部来源" || r.sourceLabel() == source) &&
             (!deepOnly || r.deep.isNotEmpty()) &&
             (q.isBlank() || r.title.contains(q) || r.resultText.contains(q) ||
                 r.sourceLabel().contains(q))

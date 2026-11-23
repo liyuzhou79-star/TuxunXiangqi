@@ -2,6 +2,7 @@ package com.tuxunxiangqi.android
 
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.fenPositionKey
+import com.tuxunxiangqi.android.data.filterRecords
 import com.tuxunxiangqi.android.data.sourceLabel
 import com.tuxunxiangqi.android.data.sourceNote
 import com.tuxunxiangqi.android.xiangqi.Fen
@@ -81,6 +82,36 @@ class RecordSourceTest {
     @Test
     fun blankFenIsEditorStart() {
         assertEquals("摆棋开局", rec("").sourceLabel())
+    }
+
+    @Test
+    fun sourceFilterKeepsOnlyThatSource() {
+        // The 1.36.0 library source row: each label keeps only
+        // its own records.
+        val standard = rec(replayFen(emptyList())).copy(id = 1)
+        val book = rec(replayFen(listOf("h2e2"))).copy(id = 2)
+        val editor = rec("").copy(id = 3)
+        val records = listOf(standard, book, editor)
+        assertEquals(3, filterRecords(records, "全部", "").size)
+        assertEquals(
+            3,
+            filterRecords(records, "全部", "", source = "全部来源").size
+        )
+        assertEquals(
+            listOf(1L),
+            filterRecords(records, "全部", "", source = "标准开局")
+                .map { it.id }
+        )
+        assertEquals(
+            listOf(2L),
+            filterRecords(records, "全部", "", source = "定式开局")
+                .map { it.id }
+        )
+        assertEquals(
+            listOf(3L),
+            filterRecords(records, "全部", "", source = "摆棋开局")
+                .map { it.id }
+        )
     }
 
     @Test

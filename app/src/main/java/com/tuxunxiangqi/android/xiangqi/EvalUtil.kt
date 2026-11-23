@@ -126,6 +126,37 @@ object EvalUtil {
         return best - move
     }
 
+    /**
+     * Per-step score the played move gave away against the deep
+     * analysis best line (1.36.0), feeding the review page's
+     * deep-loss chart. [steps] maps a position index to that
+     * position's deep candidates as (UCI, flattened score) pairs
+     * in rank order; [actualUcis] is the game's move list, so the
+     * move played from position k is actualUcis[k]. When the
+     * played move is among the candidates the loss is
+     * best-minus-played; when it is not, [fallbackLossCp] (the
+     * whole-game batch loss for that 1-based move number) stands
+     * in, and the step is skipped when that is missing too.
+     * Points come back in step order.
+     */
+    fun deepLossPoints(
+        steps: Map<Int, List<Pair<String, Int>>>,
+        actualUcis: List<String>,
+        fallbackLossCp: (Int) -> Int?
+    ): List<Pair<Int, Int>> =
+        steps.entries.sortedBy { it.key }.mapNotNull { (step, cands) ->
+            val actual = actualUcis.getOrNull(step)
+                ?: return@mapNotNull null
+            if (cands.isEmpty()) return@mapNotNull null
+            val played = cands.firstOrNull { it.first == actual }
+            val loss = if (played != null) {
+                cands.first().second - played.second
+            } else {
+                fallbackLossCp(step + 1)
+            }
+            loss?.let { step to it }
+        }
+
     /** Plain-language summary of a Red-perspective score. */
     fun describeRed(cp: Int?, mateIn: Int?): String {
         if (mateIn != null) {

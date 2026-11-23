@@ -1,6 +1,10 @@
 package com.tuxunxiangqi.android.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -155,7 +160,8 @@ fun HomeScreen(
         // itself says whether today's puzzle is already done
         // (1.21.0): 0 = not solved, 1 = solved, 2 = solved with a
         // hint (PuzzleScreen's assisted_<id> flag).
-        val (dailyState, dailyStreakDays) = remember(daily.id) {
+        val (dailyState, dailyStreakDays, recentDaily) =
+            remember(daily.id) {
             val prefs = homeContext.getSharedPreferences(
                 "puzzles", android.content.Context.MODE_PRIVATE
             )
@@ -168,10 +174,15 @@ fun HomeScreen(
             }
             val days = prefs.getStringSet("daily_days", emptySet()).orEmpty()
                 .mapNotNull { it.toLongOrNull() }.toSet()
+            val today = java.time.LocalDate.now().toEpochDay()
             val streak = com.tuxunxiangqi.android.data.dailyStreak(
-                days, java.time.LocalDate.now().toEpochDay()
+                days, today
             )
-            state to streak
+            // Last seven days as dots under the card text
+            // (1.36.0), same source as the stats page row.
+            val recent = com.tuxunxiangqi.android.data
+                .recentDailyStatus(days, today)
+            Triple(state, streak, recent)
         }
         Card(
             colors = CardDefaults.cardColors(
@@ -212,6 +223,78 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
+                }
+                if (recentDaily.any { it.second }) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for ((epochDay, done) in recentDaily) {
+                            val date = java.time.LocalDate
+                                .ofEpochDay(epochDay)
+                            val isToday = epochDay ==
+                                java.time.LocalDate.now().toEpochDay()
+                            Column(
+                                horizontalAlignment =
+                                    Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .then(
+                                            if (isToday) {
+                                                Modifier.border(
+                                                    1.5.dp,
+                                                    MaterialTheme.colorScheme
+                                                        .onPrimaryContainer,
+                                                    CircleShape
+                                                )
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
+                                        .background(
+                                            if (done) {
+                                                MaterialTheme.colorScheme
+                                                    .primary
+                                            } else {
+                                                MaterialTheme.colorScheme
+                                                    .onPrimaryContainer
+                                                    .copy(alpha = 0.20f)
+                                            },
+                                            CircleShape
+                                        )
+                                )
+                                Text(
+                                    text = if (isToday) {
+                                        "今"
+                                    } else {
+                                        when (date.dayOfWeek) {
+                                            java.time.DayOfWeek.MONDAY -> "一"
+                                            java.time.DayOfWeek.TUESDAY -> "二"
+                                            java.time.DayOfWeek.WEDNESDAY -> "三"
+                                            java.time.DayOfWeek.THURSDAY -> "四"
+                                            java.time.DayOfWeek.FRIDAY -> "五"
+                                            java.time.DayOfWeek.SATURDAY -> "六"
+                                            else -> "日"
+                                        }
+                                    },
+                                    style = MaterialTheme.typography
+                                        .labelSmall,
+                                    color = MaterialTheme.colorScheme
+                                        .onPrimaryContainer
+                                )
+                            }
+                        }
+                        Text(
+                            text = "近 7 天",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme
+                                .onPrimaryContainer
+                        )
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
                 OutlinedButton(onClick = onPuzzles) {

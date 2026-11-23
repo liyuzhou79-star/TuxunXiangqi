@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.tuxunxiangqi.android.xiangqi.EvalUtil
 
 /**
  * Evaluation trend: one point per evaluated position, x = move
@@ -117,6 +118,100 @@ fun nearestTrendMove(points: List<Pair<Int, Int>>, fraction: Float): Int? {
     val maxMove = maxOf(points.maxOf { it.first }, 10)
     val target = fraction.coerceIn(0f, 1f) * maxMove
     return points.minByOrNull { kotlin.math.abs(it.first - target) }?.first
+}
+
+/** Display fraction (0..1) for one deep-loss bar: the scale
+ *  tops out at 500cp (five pawns), so anything at or beyond
+ *  that draws full height. A negative loss (the played move
+ *  scored above the listed best, possible with stale data)
+ *  draws as zero. Pure, so the scale is pinned by unit tests. */
+fun deepLossBarFraction(lossCp: Int): Float =
+    lossCp.coerceIn(0, 500) / 500f
+
+/** Colour band for a deep-loss value, mirroring the move
+ *  marks: 0 below the questionable threshold, 1 in the
+ *  questionable band, 2 at blunder height. Pure, so the
+ *  thresholds are pinned by unit tests. */
+fun deepLossBand(lossCp: Int): Int = when {
+    lossCp >= EvalUtil.BLUNDER_CP -> 2
+    lossCp >= EvalUtil.QUESTIONABLE_CP -> 1
+    else -> 0
+}
+
+/** The deep-loss point nearest to a horizontal tap position:
+ *  bars are laid out in equal slots, so the tap fraction picks
+ *  the slot. Pure, same mapping as the drawing code. */
+fun nearestDeepLossStep(
+    points: List<Pair<Int, Int>>,
+    fraction: Float
+): Int? {
+    if (points.isEmpty()) return null
+    val idx = (fraction.coerceIn(0f, 1f) * points.size)
+        .toInt().coerceIn(0, points.size - 1)
+    return points[idx].first
+}
+
+/**
+ * Deep-analysis loss bars (1.36.0): one bar per deep-analysed
+ * step, height = how much the move actually played gave away
+ * against the engine's deep best line at that step. Tapping a
+ * bar jumps the review to that step.
+ */
+@Composable
+fun DeepLossChart(
+    points: List<Pair<Int, Int>>,
+    modifier: Modifier = Modifier,
+    onSelectStep: ((Int) -> Unit)? = null
+) {
+    val plainColor = MaterialTheme.colorScheme.onSurfaceVariant
+        .copy(alpha = 0.45f)
+    val questionColor = MaterialTheme.colorScheme.primary
+    val blunderColor = MaterialTheme.colorScheme.error
+    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
+        .copy(alpha = 0.5f)
+    val tapModifier = if (onSelectStep != null && points.isNotEmpty()) {
+        Modifier.pointerInput(points, onSelectStep) {
+            detectTapGestures { offset ->
+                nearestDeepLossStep(points, offset.x / size.width)
+                    ?.let { onSelectStep(it) }
+            }
+        }
+    } else {
+        Modifier
+    }
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .then(tapModifier)
+    ) {
+        drawLine(
+            color = axisColor,
+            start = Offset(0f, size.height),
+            end = Offset(size.width, size.height),
+            strokeWidth = 1.5f
+        )
+        if (points.isEmpty()) return@Canvas
+        val slot = size.width / points.size
+        val barWidth = slot * 0.55f
+        points.forEachIndexed { i, (_, loss) ->
+            val barHeight = deepLossBarFraction(loss) *
+                (size.height - 4f)
+            val color = when (deepLossBand(loss)) {
+                2 -> blunderColor
+                1 -> questionColor
+                else -> plainColor
+            }
+            val left = slot * i + (slot - barWidth) / 2f
+            drawRect(
+                color = color,
+                topLeft = Offset(left, size.height - barHeight),
+                size = androidx.compose.ui.geometry.Size(
+                    barWidth, barHeight
+                )
+            )
+        }
+    }
 }
 
 /** Move numbers (1-based move counts) where the evaluation swung

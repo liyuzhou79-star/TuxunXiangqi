@@ -827,6 +827,46 @@ fun ReviewScreen(
                         }
                     }
                 }
+                // Deep-loss chart (1.36.0): one bar per
+                // deep-analysed step — how much the move played
+                // there gave away against the deep best line.
+                val deepLossPts = EvalUtil.deepLossPoints(
+                    deepCache.mapValues { (_, res) ->
+                        res.candidates.mapNotNull { c ->
+                            EvalUtil.flatScore(c.scoreCp, c.mateIn)
+                                ?.let { c.moveUci to it }
+                        }
+                    },
+                    liveRecord.movesUci
+                ) { moveNo ->
+                    EvalUtil.moveLossCp(
+                        liveRecord.evals, snapshots[0].second, moveNo
+                    )
+                }
+                if (deepLossPts.size >= 2) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "深析评分差（每一步实战比引擎一选差多少）：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    DeepLossChart(
+                        points = deepLossPts,
+                        onSelectStep = { step ->
+                            playing = false
+                            replayStopAt = null
+                            idx = step
+                            scope.launch { pageScroll.animateScrollTo(0) }
+                        }
+                    )
+                    Text(
+                        text = "柱子越高，那一步走得越亏；" +
+                            "红色是掉了约 2.5 个兵以上的步。点柱子能跳到那一步。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(

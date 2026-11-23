@@ -80,6 +80,9 @@ fun RecordsScreen(
     // Deep-analysis filter (1.34.0): narrow the library to the
     // records that carry stored deep results.
     var deepOnly by remember { mutableStateOf(false) }
+    // Start-position source filter (1.36.0): the same labels the
+    // cards print (标准开局/定式开局/摆棋开局).
+    var sourceFilter by remember { mutableStateOf("全部来源") }
     var renameTarget by remember { mutableStateOf<GameRecord?>(null) }
     var renameText by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<GameRecord?>(null) }
@@ -150,9 +153,15 @@ fun RecordsScreen(
         }
     }
 
-    val shown = remember(records, filter, query, resultFilter, sortOrder, deepOnly) {
+    val shown = remember(
+        records, filter, query, resultFilter, sortOrder, deepOnly,
+        sourceFilter
+    ) {
         sortRecords(
-            filterRecords(records, filter, query, resultFilter, deepOnly),
+            filterRecords(
+                records, filter, query, resultFilter, deepOnly,
+                sourceFilter
+            ),
             sortOrder
         )
     }
@@ -234,6 +243,20 @@ fun RecordsScreen(
                         SegmentedButton(
                             selected = sortOrder == value,
                             onClick = { sortOrder = value },
+                            shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                        ) { Text(label) }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val options = listOf(
+                        "全部来源" to "全部", "标准开局" to "标准",
+                        "定式开局" to "定式", "摆棋开局" to "摆棋"
+                    )
+                    options.forEachIndexed { index, (value, label) ->
+                        SegmentedButton(
+                            selected = sourceFilter == value,
+                            onClick = { sourceFilter = value },
                             shape = SegmentedButtonDefaults.itemShape(index, options.size)
                         ) { Text(label) }
                     }

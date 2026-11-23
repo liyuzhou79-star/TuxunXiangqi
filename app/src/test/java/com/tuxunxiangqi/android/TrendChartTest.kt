@@ -1,5 +1,8 @@
 package com.tuxunxiangqi.android
 
+import com.tuxunxiangqi.android.ui.deepLossBand
+import com.tuxunxiangqi.android.ui.deepLossBarFraction
+import com.tuxunxiangqi.android.ui.nearestDeepLossStep
 import com.tuxunxiangqi.android.ui.nearestTrendMove
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -51,5 +54,34 @@ class TrendChartTest {
         assertEquals(4, nearestTrendMove(short, 0.4f))
         assertEquals(4, nearestTrendMove(short, 0.9f))
         assertEquals(0, nearestTrendMove(short, 0.05f))
+    }
+
+    @Test
+    fun deepLossScaleClamps() {
+        // The 1.36.0 deep-loss bars: 500cp (five pawns) is full
+        // height, negatives draw as zero.
+        assertEquals(0f, deepLossBarFraction(-50), 0.001f)
+        assertEquals(0f, deepLossBarFraction(0), 0.001f)
+        assertEquals(0.5f, deepLossBarFraction(250), 0.001f)
+        assertEquals(1f, deepLossBarFraction(500), 0.001f)
+        assertEquals(1f, deepLossBarFraction(1400), 0.001f)
+    }
+
+    @Test
+    fun deepLossBandsFollowTheMoveMarks() {
+        assertEquals(0, deepLossBand(0))
+        assertEquals(0, deepLossBand(119))
+        assertEquals(1, deepLossBand(120))
+        assertEquals(1, deepLossBand(249))
+        assertEquals(2, deepLossBand(250))
+    }
+
+    @Test
+    fun deepLossTapPicksTheSlot() {
+        val pts = listOf(2 to 10, 4 to 300, 7 to 60)
+        assertEquals(2, nearestDeepLossStep(pts, 0f))
+        assertEquals(4, nearestDeepLossStep(pts, 0.5f))
+        assertEquals(7, nearestDeepLossStep(pts, 1f))
+        assertNull(nearestDeepLossStep(emptyList(), 0.5f))
     }
 }
