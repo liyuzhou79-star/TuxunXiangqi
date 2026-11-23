@@ -26,11 +26,11 @@
 
 界面采用 Google Material 3 设计，棋盘是木质棋盘与圆片棋子的经典样子。
 
-> 当前版本 1.0.0（候选版）。功能已经齐备并通过一轮全面回归自查；正式发布前的签名与真机验收完成后即转正式版。各版本更新说明见 [release-notes](release-notes/) 文件夹。
+> 当前版本 1.0.0（正式版）。功能已经齐备并通过一轮全面回归自查，正式签名发布。各版本更新说明见 [release-notes](release-notes/) 文件夹。
 
 ## 构建
 
-调试包由 GitHub Actions 的 Build Debug 工作流构建。Pikafish 引擎二进制在 CI 中使用 Android NDK 编译（arm64-v8a），NNUE 网络文件为 Pikafish 官方默认网络（pikafish.nnue，随安装包内置，装完就能用）。
+调试包由 GitHub Actions 的 Build Debug 工作流构建，正式包由 Build Release 工作流构建（正式签名，构建时校验签名证书指纹，不符不予出包）。Pikafish 引擎二进制在 CI 中使用 Android NDK 编译（arm64-v8a），NNUE 网络文件为 Pikafish 官方默认网络（pikafish.nnue，随安装包内置，装完就能用）。
 
 ## 许可
 

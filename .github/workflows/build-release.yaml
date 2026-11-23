@@ -1,0 +1,128 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v1.0.0"
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Restore cached Pikafish engine
+        id: engine-cache
+        uses: actions/cache@v4
+        with:
+          path: engine-cache/libpikafish.so
+          key: pikafish-master-arm64-universal-ndk28-v1
+
+      - name: Checkout Pikafish
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: official-pikafish/Pikafish
+          ref: master
+          path: pikafish-src
+
+      - name: Download default NNUE network (for embedding)
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sL -o pikafish-src/src/pikafish.nnue "https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue"
+          ls -la pikafish-src/src/pikafish.nnue
+          test "$(stat -c%s pikafish-src/src/pikafish.nnue)" = "50308806"
+
+      # Android build recipe mirrors the Pikafish project's own CI:
+      # NDK 28, ARCH=arm64-universal, COMP=ndk, static link.
+      - name: Install NDK 28
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        run: |
+          ANDROID_ROOT=/usr/local/lib/android
+          ANDROID_SDK_ROOT=$ANDROID_ROOT/sdk
+          SDKMANAGER=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager
+          echo "y" | $SDKMANAGER "ndk;28.2.13676358"
+          echo "ANDROID_NDK_BIN=$ANDROID_SDK_ROOT/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_ENV"
+
+      - name: Build Pikafish for Android arm64
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        working-directory: pikafish-src/src
+        env:
+          ARCH: arm64-universal
+          COMP: ndk
+          LDFLAGS: "-static -Wno-unused-command-line-argument"
+        run: |
+          export PATH="${{ env.ANDROID_NDK_BIN }}:$PATH"
+          make -j4 build EXE=pikafish-android
+          make strip EXE=pikafish-android
+          ls -la pikafish-android
+          mkdir -p "$GITHUB_WORKSPACE/engine-cache"
+          cp pikafish-android "$GITHUB_WORKSPACE/engine-cache/libpikafish.so"
+
+      - name: Place engine binary into jniLibs
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          cp engine-cache/libpikafish.so app/src/main/jniLibs/arm64-v8a/libpikafish.so
+          ls -la app/src/main/jniLibs/arm64-v8a/
+
+      - name: Download NNUE network into assets
+        run: |
+          mkdir -p app/src/main/assets/engine
+          curl -sL -o app/src/main/assets/engine/pikafish.nnue "https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue"
+          ls -la app/src/main/assets/engine/
+          test "$(stat -c%s app/src/main/assets/engine/pikafish.nnue)" = "50308806"
+
+      - name: Restore signing keystore from secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TUXUNXIANGQI_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::TUXUNXIANGQI_KEYSTORE_BASE64 secret is missing; cannot sign the release build."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          ls -la "$RUNNER_TEMP/release.keystore"
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Build signed release APK
+        env:
+          TUXUNXIANGQI_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          TUXUNXIANGQI_STORE_PASSWORD: ${{ secrets.TUXUNXIANGQI_STORE_PASSWORD }}
+          TUXUNXIANGQI_KEY_ALIAS: ${{ secrets.TUXUNXIANGQI_KEY_ALIAS }}
+          TUXUNXIANGQI_KEY_PASSWORD: ${{ secrets.TUXUNXIANGQI_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Verify signature and assert release certificate
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          echo "APK: $APK"
+          ls -la "$APK"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | head -8
+          ACTUAL=$("$APKSIGNER" verify --print-certs "$APK" | grep "certificate SHA-256 digest" | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')
+          EXPECTED="b73a2080f93b8433f4ade626082b0902f0564e260da28ea070bc3433ca5b4513"
+          echo "expected: $EXPECTED"
+          echo "actual:   $ACTUAL"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Release APK is NOT signed with the expected release key; refusing to publish this build."
+            exit 1
+          fi
+          echo "Release certificate assertion passed."
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jiang-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

@@ -27,6 +27,18 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // Release signing: only created when the CI workflow restores the
+        // release keystore from repository secrets and passes its path and
+        // credentials through the environment. The key itself and its
+        // passwords never live in this repository.
+        if (System.getenv("TUXUNXIANGQI_KEYSTORE_PATH") != null) {
+            create("release") {
+                storeFile = file(System.getenv("TUXUNXIANGQI_KEYSTORE_PATH"))
+                storePassword = System.getenv("TUXUNXIANGQI_STORE_PASSWORD")
+                keyAlias = System.getenv("TUXUNXIANGQI_KEY_ALIAS")
+                keyPassword = System.getenv("TUXUNXIANGQI_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -34,7 +46,15 @@ android {
             signingConfig = signingConfigs.getByName("testPin")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            if (System.getenv("TUXUNXIANGQI_KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     androidResources {
