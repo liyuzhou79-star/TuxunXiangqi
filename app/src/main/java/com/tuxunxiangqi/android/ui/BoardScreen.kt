@@ -374,12 +374,14 @@ fun BoardScreen(
     var autoAnalyze by remember { mutableStateOf(false) }
     var analysisMs by remember { mutableStateOf(settingsStore.defaultAnalysisMs.toFloat()) }
     var evalPoints by remember {
-        mutableStateOf(
+        mutableStateOf<List<Pair<Int, Int>>>(
             resume?.evals?.entries?.sortedBy { it.key }
                 ?.map { it.key to it.value } ?: emptyList()
         )
     }
-    var lastRedCp by remember { mutableStateOf(evalPoints.lastOrNull()?.second) }
+    var lastRedCp by remember {
+        mutableStateOf<Int?>(evalPoints.lastOrNull()?.second)
+    }
     var showTrendDialog by remember { mutableStateOf(false) }
     // Dialogs / messages.
     var showResignDialog by remember { mutableStateOf(false) }
