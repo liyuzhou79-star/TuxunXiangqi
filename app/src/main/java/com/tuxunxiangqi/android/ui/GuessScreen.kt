@@ -81,6 +81,12 @@ fun GuessScreen(onBack: () -> Unit) {
     var correct by remember { mutableStateOf(0) }
     var notice by remember { mutableStateOf<String?>(null) }
     var wrongList by remember { mutableStateOf(wrongStore.loadAll()) }
+    // How many saved games are long enough to quiz from; shown
+    // on the 我的棋谱 chip so an empty-looking source explains
+    // itself before the user taps it (1.19.0).
+    var usableRecords by remember {
+        mutableStateOf(recordStore.loadAll().count { it.movesUci.size >= 8 })
+    }
     var rotation by remember { mutableStateOf(0) }
     var wrongFen by remember { mutableStateOf<String?>(null) }
     // Timed mode: 30 seconds per question; running out reveals
@@ -320,13 +326,35 @@ fun GuessScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(10.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (s in listOf("简单", "普通", "困难", "我的棋谱", "错题本")) {
+                val countLabel = when (s) {
+                    "简单" -> "（" + GuessPositions.easy.size + " 题）"
+                    "普通" -> "（" + GuessPositions.normal.size + " 题）"
+                    "困难" -> "（" + GuessPositions.hard.size + " 题）"
+                    "我的棋谱" -> "（" + usableRecords + " 局）"
+                    else -> "（" + wrongList.size + " 题）"
+                }
                 FilterChip(
                     selected = source == s,
                     onClick = { source = s },
-                    label = { Text(s) }
+                    label = { Text(s + countLabel) }
                 )
             }
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = when (source) {
+                "简单", "普通", "困难" -> "「" + source + "」题库共 " + when (source) {
+                    "简单" -> GuessPositions.easy.size
+                    "困难" -> GuessPositions.hard.size
+                    else -> GuessPositions.normal.size
+                } + " 题，随机抽题，答过的也可能再遇到。"
+                "我的棋谱" -> "能出题的棋谱共 " + usableRecords +
+                    " 局（8 手以上），从对局中段随机出题。"
+                else -> "错题本共 " + wrongList.size + " 题，猜中一选就移出。"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.height(6.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
@@ -338,7 +366,12 @@ fun GuessScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(6.dp))
         Text(
             text = "本轮成绩" + (if (timed) "（限时）" else "") +
-                "：猜对 $correct / 共 $asked 题",
+                "：猜对 $correct / 共 $asked 题" +
+                if (!revealed && currentFen.isNotBlank()) {
+                    " · 正在答第 " + (asked + 1) + " 题"
+                } else {
+                    ""
+                },
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )

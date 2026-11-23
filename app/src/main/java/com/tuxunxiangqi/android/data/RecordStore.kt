@@ -82,6 +82,14 @@ class RecordStore(context: Context) {
         writeAll(loadAll().filter { it.id != id })
     }
 
+    /** Batch delete in a single file rewrite (the multi-select
+     *  mode in the library); deleting one by one would rewrite
+     *  the whole file per record. */
+    fun deleteMany(ids: Set<Long>) {
+        if (ids.isEmpty()) return
+        writeAll(loadAll().filter { it.id !in ids })
+    }
+
     fun rename(id: Long, newTitle: String) {
         writeAll(loadAll().map {
             if (it.id == id) it.copy(title = newTitle) else it
@@ -158,8 +166,43 @@ fun GameRecord.toPortableText(): String {
     return sb.toString()
 }
 
-/** Parses the portable text format back; null when unusable. */
-fun parsePortableRecord(text: String, fallbackId: Long): GameRecord? {
+/** Serialises several records into one portable text bundle:
+ *  the per-record blocks back to back. The matching reader is
+ *  [parsePortableRecords], so a whole library (or any selection)
+ *  can travel as one text and come back with the same count. */
+fun List<GameRecord>.toPortableTextBundle(): String =
+    joinToString("\n") { it.toPortableText() }
+
+/** Parses a portable text bundle back into records. A new block
+ *  starts at each [将！棋谱] header line; text without any header
+ *  is treated as a single block, so single-record exports from
+ *  older versions import exactly as before. Blocks that fail to
+ *  parse are skipped. Ids are fallbackId, fallbackId + 1, ... by
+ *  block position so imported records never collide with each
+ *  other in the store (which dedupes by id). */
+fun parsePortableRecords(text: String, fallbackId: Long): List<GameRecord> {
+    val blocks = ArrayList<List<String>>()
+    var current = ArrayList<String>()
+    for (raw in text.lines()) {
+        if (raw.trim().startsWith("[将！棋谱]") && current.any { it.isNotBlank() }) {
+            blocks.add(current)
+            current = ArrayList()
+        }
+        current.add(raw)
+    }
+    if (current.any { it.isNotBlank() }) blocks.add(current)
+    return blocks.mapIndexedNotNull { i, lines ->
+        parsePortableBlock(lines, fallbackId + i)
+    }
+}
+
+/** Parses the portable text format back; null when unusable.
+ *  For a multi-record bundle this returns the first record;
+ *  [parsePortableRecords] returns them all. */
+fun parsePortableRecord(text: String, fallbackId: Long): GameRecord? =
+    parsePortableRecords(text, fallbackId).firstOrNull()
+
+private fun parsePortableBlock(lines: List<String>, id: Long): GameRecord? {
     var title = "导入的棋谱"
     var mode = ""
     var result = ""
@@ -167,7 +210,7 @@ fun parsePortableRecord(text: String, fallbackId: Long): GameRecord? {
     var moves: List<String> = emptyList()
     val evals = HashMap<Int, Int>()
     val marks = HashMap<Int, String>()
-    for (raw in text.lines()) {
+    for (raw in lines) {
         val line = raw.trim()
         fun value(tag: String): String? =
             if (line.startsWith("[$tag]")) line.removePrefix("[$tag]").trim() else null
@@ -200,7 +243,7 @@ fun parsePortableRecord(text: String, fallbackId: Long): GameRecord? {
     }
     if (fen.isBlank()) return null
     return GameRecord(
-        id = fallbackId,
+        id = id,
         title = title,
         dateMs = System.currentTimeMillis(),
         modeLabel = mode,

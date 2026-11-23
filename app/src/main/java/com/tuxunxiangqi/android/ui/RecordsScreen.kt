@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -39,8 +41,9 @@ import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.data.filterRecords
-import com.tuxunxiangqi.android.data.parsePortableRecord
+import com.tuxunxiangqi.android.data.parsePortableRecords
 import com.tuxunxiangqi.android.data.toPortableText
+import com.tuxunxiangqi.android.data.toPortableTextBundle
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -65,10 +68,23 @@ fun RecordsScreen(
     var deleteTarget by remember { mutableStateOf<GameRecord?>(null) }
     var importOpen by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
-    var exportFileTarget by remember { mutableStateOf<GameRecord?>(null) }
+    // Text waiting to be written by the create-document launcher:
+    // one record's portable text, or a whole selection's bundle.
+    var exportText by remember { mutableStateOf<String?>(null) }
+    // Multi-select mode (1.19.0): batch delete and batch export
+    // for cleaning up or backing up the library in one go.
+    var selectMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var deleteSelectedOpen by remember { mutableStateOf(false) }
 
     fun refresh() {
         records = store.loadAll()
+        val alive = records.map { it.id }.toSet()
+        selectedIds = selectedIds.intersect(alive)
+    }
+
+    fun toggleSelected(id: Long) {
+        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
     }
 
     fun toast(msg: String) {
@@ -82,11 +98,11 @@ fun RecordsScreen(
             try {
                 val text = context.contentResolver.openInputStream(uri)
                     ?.bufferedReader()?.readText().orEmpty()
-                val parsed = parsePortableRecord(text, System.currentTimeMillis())
-                if (parsed != null) {
-                    store.save(parsed)
+                val parsed = parsePortableRecords(text, System.currentTimeMillis())
+                if (parsed.isNotEmpty()) {
+                    parsed.forEach { store.save(it) }
                     refresh()
-                    toast("导入成功")
+                    toast("导入成功，共 " + parsed.size + " 局")
                 } else {
                     toast("这个文件不是将！的棋谱文本")
                 }
@@ -98,12 +114,12 @@ fun RecordsScreen(
     val exportFileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")
     ) { uri ->
-        val target = exportFileTarget
-        exportFileTarget = null
-        if (uri != null && target != null) {
+        val text = exportText
+        exportText = null
+        if (uri != null && text != null) {
             try {
                 context.contentResolver.openOutputStream(uri)?.bufferedWriter()
-                    ?.use { it.write(target.toPortableText()) }
+                    ?.use { it.write(text) }
                 toast("已导出到文件")
             } catch (_: Exception) {
                 toast("导出失败")
@@ -111,8 +127,8 @@ fun RecordsScreen(
         }
     }
 
-    LaunchedEffect(exportFileTarget) {
-        if (exportFileTarget != null) {
+    LaunchedEffect(exportText) {
+        if (exportText != null) {
             exportFileLauncher.launch("jiang-record.txt")
         }
     }
@@ -167,6 +183,67 @@ fun RecordsScreen(
                     OutlinedButton(onClick = {
                         importFileLauncher.launch(arrayOf("text/plain", "text/*"))
                     }) { Text("从文件导入") }
+                    OutlinedButton(onClick = {
+                        selectMode = !selectMode
+                        if (!selectMode) selectedIds = emptySet()
+                    }) { Text(if (selectMode) "退出多选" else "多选管理") }
+                }
+                if (selectMode) {
+                    Spacer(Modifier.height(10.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "已选 " + selectedIds.size + " 局 · 当前列表 " +
+                                    shown.size + " 局（全部 " + records.size + " 局）",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = {
+                                    selectedIds = selectedIds + shown.map { it.id }
+                                }) { Text("全选当前列表") }
+                                OutlinedButton(
+                                    onClick = { selectedIds = emptySet() },
+                                    enabled = selectedIds.isNotEmpty()
+                                ) { Text("清空选择") }
+                                OutlinedButton(
+                                    onClick = {
+                                        val sel = records.filter { it.id in selectedIds }
+                                        clipboard.setText(
+                                            AnnotatedString(sel.toPortableTextBundle())
+                                        )
+                                        toast("已复制 " + sel.size + " 局棋谱文本")
+                                    },
+                                    enabled = selectedIds.isNotEmpty()
+                                ) { Text("复制所选") }
+                                OutlinedButton(
+                                    onClick = {
+                                        exportText = records
+                                            .filter { it.id in selectedIds }
+                                            .toPortableTextBundle()
+                                    },
+                                    enabled = selectedIds.isNotEmpty()
+                                ) { Text("导出所选到文件") }
+                                TextButton(
+                                    onClick = { deleteSelectedOpen = true },
+                                    enabled = selectedIds.isNotEmpty()
+                                ) { Text("删除所选") }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "点下面的棋谱卡就能勾选。导出的多局文本可以整段粘贴导入，局数不变。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
             }
@@ -194,46 +271,81 @@ fun RecordsScreen(
         }
 
         items(shown, key = { it.id }) { r ->
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = r.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = dateFmt.format(Date(r.dateMs)) + " · 共 " +
-                            r.movesUci.size + " 手 · " + r.resultText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onOpenReview(r) }) {
-                            Text("复盘")
+            if (selectMode) {
+                Card(
+                    onClick = { toggleSelected(r.id) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (r.id in selectedIds) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
                         }
-                        OutlinedButton(onClick = {
-                            renameTarget = r
-                            renameText = r.title
-                        }) { Text("改名") }
-                        OutlinedButton(onClick = {
-                            clipboard.setText(AnnotatedString(r.toPortableText()))
-                            toast("棋谱文本已复制，去任意地方粘贴就能分享")
-                        }) { Text("复制文本") }
-                        OutlinedButton(onClick = {
-                            shareText(context, r.toPortableText(), r.title)
-                        }) { Text("分享") }
-                        OutlinedButton(onClick = { exportFileTarget = r }) {
-                            Text("导出文件")
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
+                        Checkbox(
+                            checked = r.id in selectedIds,
+                            onCheckedChange = { toggleSelected(r.id) }
+                        )
+                        Column(modifier = Modifier.padding(top = 10.dp)) {
+                            Text(
+                                text = r.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = dateFmt.format(Date(r.dateMs)) + " · 共 " +
+                                    r.movesUci.size + " 手 · " + r.resultText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        TextButton(onClick = { deleteTarget = r }) {
-                            Text("删除")
+                    }
+                }
+            } else {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = r.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = dateFmt.format(Date(r.dateMs)) + " · 共 " +
+                                r.movesUci.size + " 手 · " + r.resultText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { onOpenReview(r) }) {
+                                Text("复盘")
+                            }
+                            OutlinedButton(onClick = {
+                                renameTarget = r
+                                renameText = r.title
+                            }) { Text("改名") }
+                            OutlinedButton(onClick = {
+                                clipboard.setText(AnnotatedString(r.toPortableText()))
+                                toast("棋谱文本已复制，去任意地方粘贴就能分享")
+                            }) { Text("复制文本") }
+                            OutlinedButton(onClick = {
+                                shareText(context, r.toPortableText(), r.title)
+                            }) { Text("分享") }
+                            OutlinedButton(onClick = { exportText = r.toPortableText() }) {
+                                Text("导出文件")
+                            }
+                            TextButton(onClick = { deleteTarget = r }) {
+                                Text("删除")
+                            }
                         }
                     }
                 }
@@ -295,6 +407,27 @@ fun RecordsScreen(
         )
     }
 
+    if (deleteSelectedOpen) {
+        AlertDialog(
+            onDismissRequest = { deleteSelectedOpen = false },
+            title = { Text("删除选中的 " + selectedIds.size + " 局棋谱？") },
+            text = { Text("删了就找不回来了。重要的棋谱建议先用「导出所选到文件」存一份。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    store.deleteMany(selectedIds)
+                    deleteSelectedOpen = false
+                    selectedIds = emptySet()
+                    selectMode = false
+                    refresh()
+                    toast("已删除")
+                }) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteSelectedOpen = false }) { Text("取消") }
+            }
+        )
+    }
+
     if (importOpen) {
         AlertDialog(
             onDismissRequest = { importOpen = false },
@@ -302,7 +435,7 @@ fun RecordsScreen(
             text = {
                 Column {
                     Text(
-                        text = "把从将！导出的棋谱文本整段粘贴进来（包含 [FEN] 那一行）。",
+                        text = "把从将！导出的棋谱文本整段粘贴进来（包含 [FEN] 那一行）。多选导出的多局文本也能整段粘贴，局数不变。",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(Modifier.height(8.dp))
@@ -316,11 +449,11 @@ fun RecordsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val parsed = parsePortableRecord(importText, System.currentTimeMillis())
-                    if (parsed != null) {
-                        store.save(parsed)
+                    val parsed = parsePortableRecords(importText, System.currentTimeMillis())
+                    if (parsed.isNotEmpty()) {
+                        parsed.forEach { store.save(it) }
                         refresh()
-                        toast("导入成功")
+                        toast("导入成功，共 " + parsed.size + " 局")
                         importOpen = false
                         importText = ""
                     } else {

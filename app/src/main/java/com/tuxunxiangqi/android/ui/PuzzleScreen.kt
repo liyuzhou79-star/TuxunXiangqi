@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -59,6 +60,10 @@ fun PuzzleScreen(onBack: () -> Unit) {
         mutableStateOf(prefs.getStringSet("solved", emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet())
     }
     var playing by remember { mutableStateOf<Puzzle?>(null) }
+    // List filters (1.19.0): one difficulty tier at a time, plus
+    // an unsolved-only toggle for working through what's left.
+    var diffFilter by remember { mutableStateOf<Int?>(null) }
+    var unsolvedOnly by remember { mutableStateOf(false) }
 
     if (playing != null) {
         PuzzlePlay(
@@ -112,9 +117,50 @@ fun PuzzleScreen(onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(14.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = diffFilter == null,
+                onClick = { diffFilter = null },
+                label = { Text("全部难度") }
+            )
+            for ((tier, label) in listOf(1 to "★ 简单", 2 to "★★ 进阶", 3 to "★★★ 困难")) {
+                FilterChip(
+                    selected = diffFilter == tier,
+                    onClick = { diffFilter = tier },
+                    label = { Text(label) }
+                )
+            }
+            FilterChip(
+                selected = unsolvedOnly,
+                onClick = { unsolvedOnly = !unsolvedOnly },
+                label = { Text("只看未解") }
+            )
+        }
+        Spacer(Modifier.height(14.dp))
         val sortedPuzzles = Puzzles.all.sortedBy { it.id }
+        val anyShown = Puzzles.filterPuzzles(
+            sortedPuzzles, diffFilter, unsolvedOnly, solvedIds
+        ).isNotEmpty()
+        if (!anyShown) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "没有符合筛选的题目，换个难度或关掉「只看未解」试试。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+        }
         for (category in Puzzles.categoryOrder) {
-            val group = sortedPuzzles.filter { Puzzles.categoryOf(it.id) == category }
+            val group = Puzzles.filterPuzzles(
+                sortedPuzzles.filter { Puzzles.categoryOf(it.id) == category },
+                diffFilter, unsolvedOnly, solvedIds
+            )
             if (group.isEmpty()) continue
             val groupSolved = group.count { it.id in solvedIds }
             Text(

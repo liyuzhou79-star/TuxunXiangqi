@@ -211,6 +211,20 @@ object Puzzles {
 
     fun difficultyOf(id: Int): Int = difficultyById[id] ?: 2
 
+    /** The list page's filter (1.19.0): keep puzzles of one
+     *  difficulty tier (null = all tiers) and optionally only
+     *  the ones not solved yet. Pure, so the tier distribution
+     *  and the unsolved logic are pinned by unit tests. */
+    fun filterPuzzles(
+        list: List<Puzzle>,
+        difficulty: Int?,
+        unsolvedOnly: Boolean,
+        solvedIds: Set<Int>
+    ): List<Puzzle> = list.filter { p ->
+        (difficulty == null || difficultyOf(p.id) == difficulty) &&
+            (!unsolvedOnly || p.id !in solvedIds)
+    }
+
     /** Ids lacking an explicit category entry — the unit test
      *  pins this to empty so a new puzzle can never silently land
      *  in the fallback bucket. (Difficulty defaults to 2 by
