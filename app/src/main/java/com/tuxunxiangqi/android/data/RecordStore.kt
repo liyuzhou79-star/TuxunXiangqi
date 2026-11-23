@@ -125,18 +125,29 @@ class RecordStore(context: Context) {
     }
 }
 
-/** The library screen's filter: mode chip plus a free-text
- *  match on title or result. Pure and allocation-light so a
- *  library of hundreds of records filters instantly; pinned by
- *  RecordsPerfTest at 200 records. */
+/** The library screen's filter: mode chip, result chip and a
+ *  free-text match on title or result. Result chips match the
+ *  resultText prefixes BoardScreen writes ("红方胜 · …",
+ *  "黑方胜 · …", "和棋 · …"); "未分胜负" keeps the rest
+ *  (mid-game saves and result-less finishes). Pure and
+ *  allocation-light so a library of hundreds of records
+ *  filters instantly; pinned by RecordsPerfTest at 200 records. */
 fun filterRecords(
     records: List<GameRecord>,
     filter: String,
-    query: String
+    query: String,
+    result: String = "全部结果"
 ): List<GameRecord> {
     val q = query.trim()
     return records.filter { r ->
-        (filter == "全部" || r.modeLabel.startsWith(filter)) &&
+        val resultOk = when (result) {
+            "全部结果" -> true
+            "未分胜负" -> !r.resultText.startsWith("红方胜") &&
+                !r.resultText.startsWith("黑方胜") &&
+                !r.resultText.startsWith("和棋")
+            else -> r.resultText.startsWith(result)
+        }
+        (filter == "全部" || r.modeLabel.startsWith(filter)) && resultOk &&
             (q.isBlank() || r.title.contains(q) || r.resultText.contains(q))
     }
 }

@@ -30,13 +30,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import android.widget.Toast
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
+import com.tuxunxiangqi.android.data.toPortableText
 import com.tuxunxiangqi.android.engine.AnalysisResult
 import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
@@ -55,6 +59,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     val engine = remember { PikafishEngine(context) }
     DisposableEffect(engine) { onDispose { engine.close() } }
     LaunchedEffect(Unit) { engine.start({}, {}) }
@@ -331,6 +336,19 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Spacer(Modifier.height(8.dp))
+        // Share this game straight from the review page (1.20.0):
+        // the portable text carries the whole-game analysis
+        // marks too once they have been computed and saved.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                clipboard.setText(AnnotatedString(liveRecord.toPortableText()))
+                Toast.makeText(context, "棋谱文本已复制", Toast.LENGTH_SHORT).show()
+            }) { Text("复制这局") }
+            OutlinedButton(onClick = {
+                shareText(context, liveRecord.toPortableText(), liveRecord.title)
+            }) { Text("分享这局") }
+        }
         Spacer(Modifier.height(12.dp))
 
         val deepNow = deepCache[idx]

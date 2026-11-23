@@ -63,6 +63,7 @@ fun RecordsScreen(
     var records by remember { mutableStateOf(store.loadAll()) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("全部") }
+    var resultFilter by remember { mutableStateOf("全部结果") }
     var renameTarget by remember { mutableStateOf<GameRecord?>(null) }
     var renameText by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<GameRecord?>(null) }
@@ -133,8 +134,8 @@ fun RecordsScreen(
         }
     }
 
-    val shown = remember(records, filter, query) {
-        filterRecords(records, filter, query)
+    val shown = remember(records, filter, query, resultFilter) {
+        filterRecords(records, filter, query, resultFilter)
     }
     val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA) }
 
@@ -173,6 +174,16 @@ fun RecordsScreen(
                         FilterChip(
                             selected = filter == f,
                             onClick = { filter = f },
+                            label = { Text(f) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (f in listOf("全部结果", "红方胜", "黑方胜", "和棋", "未分胜负")) {
+                        FilterChip(
+                            selected = resultFilter == f,
+                            onClick = { resultFilter = f },
                             label = { Text(f) }
                         )
                     }

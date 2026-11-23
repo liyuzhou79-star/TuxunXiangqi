@@ -63,6 +63,13 @@ class RecordsPerfTest {
             assertEquals(20, filterRecords(records, "全部", "经典").size)
             assertEquals(66, filterRecords(records, "人机对弈", "").size)
             assertEquals(66, filterRecords(records, "全部", "将死").size)
+            // Result chips (1.20.0): the fixture alternates
+            // 红方胜 every third record, 黑方胜 otherwise.
+            assertEquals(66, filterRecords(records, "全部", "", "红方胜").size)
+            assertEquals(134, filterRecords(records, "全部", "", "黑方胜").size)
+            assertEquals(0, filterRecords(records, "全部", "", "和棋").size)
+            assertEquals(0, filterRecords(records, "全部", "", "未分胜负").size)
+            assertEquals(200, filterRecords(records, "全部", "", "全部结果").size)
         }
         val filterMs = (System.nanoTime() - t1) / 1_000_000
         assertTrue("200-record filter too slow: $filterMs ms", filterMs < 5_000)

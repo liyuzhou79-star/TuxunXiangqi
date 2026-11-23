@@ -136,12 +136,23 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 label = { Text("只看未解") }
             )
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(10.dp))
         val sortedPuzzles = Puzzles.all.sortedBy { it.id }
-        val anyShown = Puzzles.filterPuzzles(
+        val shownPuzzles = Puzzles.filterPuzzles(
             sortedPuzzles, diffFilter, unsolvedOnly, solvedIds
-        ).isNotEmpty()
-        if (!anyShown) {
+        )
+        // One-tap practice (1.20.0): a random puzzle from what
+        // the filters currently show, unsolved ones first.
+        OutlinedButton(
+            onClick = {
+                val unsolved = shownPuzzles.filter { it.id !in solvedIds }
+                val pool = if (unsolved.isNotEmpty()) unsolved else shownPuzzles
+                if (pool.isNotEmpty()) playing = pool.random()
+            },
+            enabled = shownPuzzles.isNotEmpty()
+        ) { Text("随手来一题（优先未解）") }
+        Spacer(Modifier.height(14.dp))
+        if (shownPuzzles.isEmpty()) {
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer
