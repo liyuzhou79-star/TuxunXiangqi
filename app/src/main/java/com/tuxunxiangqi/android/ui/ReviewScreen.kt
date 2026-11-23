@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -93,6 +94,9 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
 
     var idx by remember { mutableStateOf(0) }
     var playing by remember { mutableStateOf(false) }
+    // Hoisted so the move list at the bottom of the page can
+    // scroll back to the board after a jump (1.17.0).
+    val pageScroll = rememberScrollState()
     var compareText by remember { mutableStateOf<String?>(null) }
     var compareBusy by remember { mutableStateOf(false) }
 
@@ -313,7 +317,7 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(pageScroll)
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
         Text(
@@ -786,21 +790,55 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(8.dp))
-                val text = buildString {
-                    notations.forEachIndexed { i, n ->
-                        val marked = n + (liveRecord.marks[i + 1] ?: "")
-                        if (i % 2 == 0) {
-                            if (i > 0) append('\n')
-                            append(i / 2 + 1).append(". ").append(marked)
-                        } else {
-                            append("  ").append(marked)
+                if (notations.isEmpty()) {
+                    Text(
+                        text = "（无着法记录）",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else {
+                    // Every move is a tappable chip (1.17.0):
+                    // tapping jumps the board straight to the
+                    // position after that move and scrolls back
+                    // up to the board. The chip for the move
+                    // that produced the current position stays
+                    // selected; batch-analysis marks ride along
+                    // in the label, as the old text table did.
+                    Text(
+                        text = "点任意一手，直接跳到那一步。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for (i in notations.indices) {
+                            val n = notations[i]
+                            if (i % 2 == 0) {
+                                Text(
+                                    text = "${i / 2 + 1}.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme
+                                        .colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 10.dp)
+                                )
+                            }
+                            FilterChip(
+                                selected = idx == i + 1,
+                                onClick = {
+                                    playing = false
+                                    idx = i + 1
+                                    scope.launch {
+                                        pageScroll.animateScrollTo(0)
+                                    }
+                                },
+                                label = {
+                                    Text(n + (liveRecord.marks[i + 1] ?: ""))
+                                }
+                            )
                         }
                     }
                 }
-                Text(
-                    text = if (text.isBlank()) "（无着法记录）" else text,
-                    style = MaterialTheme.typography.bodyMedium
-                )
             }
         }
 
