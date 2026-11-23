@@ -23,12 +23,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -68,12 +69,24 @@ private val BlackInk = Color(0xFF2A241C)
  *  board needs. See THIRD_PARTY_NOTICES.md. */
 val PieceFontFamily = FontFamily(Font(R.font.bakudai_bold, FontWeight.Bold))
 
+/** The bundled walnut-grain photo (CC BY-SA 3.0; see
+ *  THIRD_PARTY_NOTICES.md), decoded once and remembered. */
+@Composable
+private fun rememberWoodBitmap(): ImageBitmap {
+    val context = LocalContext.current
+    return remember {
+        android.graphics.BitmapFactory.decodeResource(
+            context.resources, R.drawable.board_wood
+        ).asImageBitmap()
+    }
+}
+
 @Composable
 fun BoardFrame(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val wood = imageResource(R.drawable.board_wood)
+    val wood = rememberWoodBitmap()
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
@@ -130,7 +143,7 @@ fun XiangqiBoard(
     extraHints: List<Pair<Pos, Pos>> = emptyList()
 ) {
     val measurer = rememberTextMeasurer()
-    val wood = imageResource(R.drawable.board_wood)
+    val wood = rememberWoodBitmap()
     // Board geometry in cell units: grid is 8 wide x 9 tall, with a
     // 0.62-cell margin so edge pieces never clip.
     val marginUnits = 0.62f
