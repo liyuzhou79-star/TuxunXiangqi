@@ -46,7 +46,7 @@ class PuzzleFenTest {
     @Test
     fun allPuzzleFensAreSane() {
         for (p in Puzzles.all) checkFen(p.fen)
-        assertEquals(101, Puzzles.all.size)
+        assertEquals(105, Puzzles.all.size)
     }
 
     @Test
