@@ -176,7 +176,7 @@ object OpeningBook {
         "h2e2 h7e7 h0g2 h9g7 b0c2" to listOf(
             "b9c7" to "马2进3",
             "i9i8" to "车9进1",
-            "g9e7" to "象7进5",
+            "c6c5" to "卒3进1",
         ),
         "c3c4 c6c5 c4c5 h9g7 h2e2" to listOf(
             "h7e7" to "炮8平5",
