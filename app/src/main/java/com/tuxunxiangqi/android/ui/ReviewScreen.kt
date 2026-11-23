@@ -43,6 +43,7 @@ import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.Notation
 import com.tuxunxiangqi.android.xiangqi.Piece
+import com.tuxunxiangqi.android.xiangqi.Pos
 import com.tuxunxiangqi.android.xiangqi.Side
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
