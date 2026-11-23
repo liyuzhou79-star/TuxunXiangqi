@@ -54,5 +54,8 @@ class PuzzleFenTest {
         for ((_, fen) in GuessPositions.easy + GuessPositions.normal + GuessPositions.hard) {
             checkFen(fen)
         }
+        assertEquals(8, GuessPositions.easy.size)
+        assertEquals(8, GuessPositions.normal.size)
+        assertEquals(8, GuessPositions.hard.size)
     }
 }

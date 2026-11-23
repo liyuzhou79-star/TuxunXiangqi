@@ -72,6 +72,7 @@ fun SettingsScreen(
     var safetyHintsOn by remember { mutableStateOf(store.safetyHintsOn) }
     var updateText by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(false) }
+    var resetOpen by remember { mutableStateOf(false) }
     var importOpen by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
     var clearOpen by remember { mutableStateOf(false) }
@@ -288,6 +289,13 @@ fun SettingsScreen(
                 valueRange = 500f..4000f,
                 steps = 6
             )
+            Spacer(Modifier.height(6.dp))
+            TextButton(onClick = { resetOpen = true }) { Text("恢复默认设置") }
+            Text(
+                text = "把主题、音效、安危提示和上面的对弈默认全部还原成出厂值。棋谱和错题本不动。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         SettingsCard(title = "我的数据") {
@@ -404,6 +412,31 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { importOpen = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (resetOpen) {
+        AlertDialog(
+            onDismissRequest = { resetOpen = false },
+            title = { Text("恢复默认设置？") },
+            text = { Text("主题、音效、落点安危提示、默认难度、默认棋钟、默认分析时长和棋力细调都会回到出厂值。棋谱、错题本和残局进度不动。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    store.resetToDefaults()
+                    themeMode = store.themeMode
+                    level = store.defaultLevelLabel
+                    clock = store.defaultClockMinutes
+                    analysisMs = store.defaultAnalysisMs.toFloat()
+                    soundOn = store.soundOn
+                    safetyHintsOn = store.safetyHintsOn
+                    onThemeChanged(themeMode)
+                    resetOpen = false
+                    toast("设置已恢复默认")
+                }) { Text("恢复") }
+            },
+            dismissButton = {
+                TextButton(onClick = { resetOpen = false }) { Text("取消") }
             }
         )
     }

@@ -49,6 +49,14 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("safetyHintsOn", true)
         set(value) = prefs.edit().putBoolean("safetyHintsOn", value).apply()
 
+    /** Wipes every stored preference. All getters carry their
+     *  defaults, so clearing the file restores factory settings
+     *  (theme, defaults, sound, safety hints, strength). Records
+     *  and the wrong book live in other files and are untouched. */
+    fun resetToDefaults() {
+        prefs.edit().clear().apply()
+    }
+
     fun toJson(): JSONObject {
         val o = JSONObject()
         o.put("themeMode", themeMode)

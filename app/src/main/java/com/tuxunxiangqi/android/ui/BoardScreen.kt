@@ -114,7 +114,8 @@ private data class CandidateUi(
     val title: String,
     val scoreText: String,
     val pvText: String,
-    val redWinPercent: Double
+    val redWinPercent: Double,
+    val pvUci: List<String>
 )
 
 /** Removes the handicap pieces from [side] on a fresh start layout. */
@@ -317,6 +318,12 @@ fun BoardScreen(
     var candidates by remember { mutableStateOf<List<CandidateUi>>(emptyList()) }
     var selectedRank by remember { mutableStateOf(1) }
     var hintMove by remember { mutableStateOf<Pair<Pos, Pos>?>(null) }
+    // Candidate preview （试走）: a scratch board the candidate's
+    // PV line is played out on. Purely visual — the real game
+    // state is never touched, and any real move exits preview.
+    var previewRank by remember { mutableStateOf<Int?>(null) }
+    var previewStep by remember { mutableStateOf(0) }
+    val previewState = remember { GameState() }
     var autoAnalyze by remember { mutableStateOf(false) }
     var analysisMs by remember { mutableStateOf(settingsStore.defaultAnalysisMs.toFloat()) }
     var evalPoints by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
@@ -354,6 +361,12 @@ fun BoardScreen(
     val extraHints = candidates
         .filter { it.rank != selectedRank }
         .map { it.from to it.to }
+    val previewCand = candidates.firstOrNull { it.rank == previewRank }
+    val previewNextHint = if (previewCand != null && previewStep < previewCand.pvUci.size) {
+        Fen.parseUciMove(previewCand.pvUci[previewStep])
+    } else {
+        null
+    }
 
     fun addEvalPoint(moveCount: Int, redCp: Int) {
         val cleaned = evalPoints.filter { it.first != moveCount }
@@ -365,6 +378,33 @@ fun BoardScreen(
         candidates = emptyList()
         hintMove = null
         selectedRank = 1
+        previewRank = null
+        previewStep = 0
+    }
+
+    /** Rebuilds the preview board: live position plus the first
+     *  [step] moves of the candidate's PV. Rebuilding from scratch
+     *  keeps stepping trivially correct in both directions. */
+    fun applyPreview(cand: CandidateUi, step: Int) {
+        previewState.loadPosition(state.cells.toList(), state.turn)
+        val n = step.coerceIn(0, cand.pvUci.size)
+        for (i in 0 until n) {
+            val mv = Fen.parseUciMove(cand.pvUci[i]) ?: break
+            if (!previewState.tryMove(mv.first, mv.second)) break
+        }
+        previewStep = n
+    }
+
+    fun startPreview(cand: CandidateUi) {
+        selectedRank = cand.rank
+        hintMove = cand.from to cand.to
+        previewRank = cand.rank
+        applyPreview(cand, 1)
+    }
+
+    fun exitPreview() {
+        previewRank = null
+        previewStep = 0
     }
 
     fun currentRecord(final: Boolean): GameRecord {
@@ -495,6 +535,7 @@ fun BoardScreen(
 
     fun runAnalysis() {
         if (busy || state.result != null || !setupDone) return
+        exitPreview()
         analysisBusy = true
         engineError = null
         notice = null
@@ -526,7 +567,8 @@ fun BoardScreen(
                                 scoreText = EvalUtil.describeRed(redCp, redMate),
                                 pvText = Notation.pvText(cellsSnapshot, cand.pvUci, 5)
                                     .joinToString(" "),
-                                redWinPercent = EvalUtil.winRatePercent(redCp, redMate)
+                                redWinPercent = EvalUtil.winRatePercent(redCp, redMate),
+                                pvUci = cand.pvUci.take(12)
                             )
                         )
                     }
@@ -557,6 +599,16 @@ fun BoardScreen(
         ) {
             runAnalysis()
         }
+    }
+
+    // A preview is only meaningful for the exact position it was
+    // computed on: any real move (or undo, which also changes the
+    // count) ends it, as does entering focus mode.
+    LaunchedEffect(state.moveCount) {
+        if (previewRank != null) exitPreview()
+    }
+    LaunchedEffect(focusMode) {
+        if (focusMode && previewRank != null) exitPreview()
     }
 
     // Chess clock: counts down the side to move; timeout loses.
@@ -889,21 +941,74 @@ fun BoardScreen(
                 ) {
                     BoardFrame(modifier = Modifier.fillMaxWidth()) {
                         XiangqiBoard(
-                            state = state,
-                            selected = selected,
-                            legalTargets = targets,
-                            hint = hintMove,
-                            extraHints = extraHints,
+                            state = if (previewRank != null) previewState else state,
+                            selected = if (previewRank != null) null else selected,
+                            legalTargets = if (previewRank != null) emptyList() else targets,
+                            hint = if (previewRank != null) previewNextHint else hintMove,
+                            extraHints = if (previewRank != null) emptyList() else extraHints,
                             flipped = flipped,
                             showCoords = showCoords,
-                            targetSafety = targetSafety,
-                            onTap = { pos -> onTap(pos) }
+                            targetSafety = if (previewRank != null) emptyMap() else targetSafety,
+                            onTap = { pos -> if (previewRank == null) onTap(pos) }
                         )
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
-                CapturedStrip(state)
+                if (previewRank != null) {
+                    CapturedStrip(state.cells.toList(), previewState.cells)
+                } else {
+                    CapturedStrip(state)
+                }
+                if (previewRank != null && previewCand != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "试走中：" + when (previewCand.rank) {
+                                    1 -> "一选"
+                                    2 -> "二选"
+                                    3 -> "三选"
+                                    else -> "四选"
+                                } + " · 已摆到第 $previewStep / ${previewCand.pvUci.size} 步",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = previewNextHint?.let {
+                                    "下一步：" + Notation.moveText(
+                                        previewState.cells, it.first, it.second
+                                    )
+                                } ?: "这条变化已经走完。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = { applyPreview(previewCand, previewStep - 1) },
+                                    enabled = previewStep > 0
+                                ) { Text("上一步") }
+                                OutlinedButton(
+                                    onClick = { applyPreview(previewCand, previewStep + 1) },
+                                    enabled = previewStep < previewCand.pvUci.size
+                                ) { Text("下一步") }
+                                TextButton(onClick = { exitPreview() }) { Text("退出试走") }
+                            }
+                            Text(
+                                text = "试走只是把引擎的变化摆出来看，不会真的落子；正式走子或悔棋都会自动回到实战局面。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
                 // View toggles.
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
@@ -1088,7 +1193,8 @@ fun BoardScreen(
                                     onClick = {
                                         selectedRank = cand.rank
                                         hintMove = cand.from to cand.to
-                                    }
+                                    },
+                                    onPreview = { startPreview(cand) }
                                 )
                                 Spacer(Modifier.height(6.dp))
                             }
@@ -1284,7 +1390,12 @@ private fun ClockCard(label: String, ms: Long, active: Boolean, modifier: Modifi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CandidateRow(cand: CandidateUi, chosen: Boolean, onClick: () -> Unit) {
+private fun CandidateRow(
+    cand: CandidateUi,
+    chosen: Boolean,
+    onClick: () -> Unit,
+    onPreview: () -> Unit
+) {
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(
@@ -1328,6 +1439,10 @@ private fun CandidateRow(cand: CandidateUi, chosen: Boolean, onClick: () -> Unit
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            Row {
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onPreview) { Text("试走这条线") }
             }
         }
     }
