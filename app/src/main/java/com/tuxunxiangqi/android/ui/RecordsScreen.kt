@@ -6,6 +6,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
@@ -174,7 +176,7 @@ fun RecordsScreen(
                     label = { Text("搜索棋谱") },
                     leadingIcon = {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Filled.Search,
+                            imageVector = Icons.Filled.Search,
                             contentDescription = null
                         )
                     },

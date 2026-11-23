@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
@@ -112,8 +115,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 editor.apply()
             }
         )
-        return
-    }
+    } else {
 
     val daily = Puzzles.daily(Calendar.getInstance().get(Calendar.DAY_OF_YEAR))
 
@@ -235,7 +237,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 leadingContent = if (solved) {
                     {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Filled.CheckCircle,
+                            imageVector = Icons.Filled.CheckCircle,
                             contentDescription = "已解出",
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -245,7 +247,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 },
                 trailingContent = {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.KeyboardArrowRight,
+                        imageVector = Icons.Filled.KeyboardArrowRight,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -257,6 +259,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(8.dp))
         }
         Spacer(Modifier.height(24.dp))
+    }
     }
     }
 }
