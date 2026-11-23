@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +24,12 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,7 +59,7 @@ import java.util.Locale
 /** Game library: finished games land here automatically; records
  *  can be searched, filtered, renamed, deleted, exported as text
  *  or file, and imported back the same ways. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RecordsScreen(
     onBack: () -> Unit,
@@ -145,19 +151,17 @@ fun RecordsScreen(
     // LazyColumn (1.13.0): with a few hundred records the old
     // eager Column composed every card at once and the page
     // opened slowly; now only the visible cards are composed.
+    Scaffold(
+        topBar = { SubPageTopBar("棋谱库", onBack) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
             Column {
-                Text(
-                    text = "棋谱",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(4.dp))
                 Text(
                     text = "对局结束会自动存到这里；点开任意一局就能复盘。棋谱可以导出成文本或文件，换手机也不怕丢。",
                     style = MaterialTheme.typography.bodyMedium,
@@ -168,37 +172,60 @@ fun RecordsScreen(
                     value = query,
                     onValueChange = { query = it },
                     label = { Text("搜索棋谱") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Filled.Search,
+                            contentDescription = null
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (f in listOf("全部", "人机对弈", "人人对弈", "AI 表演赛")) {
-                        FilterChip(
-                            selected = filter == f,
-                            onClick = { filter = f },
-                            label = { Text(f) }
-                        )
+                // Single-choice rows are M3 segmented buttons
+                // (1.25.0), not stacks of filter chips; the
+                // values behind the short labels are unchanged.
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val options = listOf(
+                        "全部" to "全部", "人机对弈" to "人机",
+                        "人人对弈" to "人人", "AI 表演赛" to "表演赛"
+                    )
+                    options.forEachIndexed { index, (value, label) ->
+                        SegmentedButton(
+                            selected = filter == value,
+                            onClick = { filter = value },
+                            shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                        ) { Text(label) }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (f in listOf("全部结果", "红方胜", "黑方胜", "和棋", "未分胜负")) {
-                        FilterChip(
-                            selected = resultFilter == f,
-                            onClick = { resultFilter = f },
-                            label = { Text(f) }
-                        )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val options = listOf(
+                        "全部结果" to "全部", "红方胜" to "红胜",
+                        "黑方胜" to "黑胜", "和棋" to "和棋",
+                        "未分胜负" to "未分"
+                    )
+                    options.forEachIndexed { index, (value, label) ->
+                        SegmentedButton(
+                            selected = resultFilter == value,
+                            onClick = { resultFilter = value },
+                            shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                        ) { Text(label) }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (s in listOf("最新在前", "最早在前", "手数多到少", "手数少到多", "标题")) {
-                        FilterChip(
-                            selected = sortOrder == s,
-                            onClick = { sortOrder = s },
-                            label = { Text(s) }
-                        )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val options = listOf(
+                        "最新在前" to "最新", "最早在前" to "最早",
+                        "手数多到少" to "手数多", "手数少到多" to "手数少",
+                        "标题" to "标题"
+                    )
+                    options.forEachIndexed { index, (value, label) ->
+                        SegmentedButton(
+                            selected = sortOrder == value,
+                            onClick = { sortOrder = value },
+                            shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                        ) { Text(label) }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -377,12 +404,9 @@ fun RecordsScreen(
         }
 
         item {
-            Column {
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onBack) { Text("返回") }
-                Spacer(Modifier.height(24.dp))
-            }
+            Spacer(Modifier.height(24.dp))
         }
+    }
     }
 
     if (renameTarget != null) {

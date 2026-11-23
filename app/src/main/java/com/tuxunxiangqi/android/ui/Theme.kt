@@ -28,6 +28,16 @@ private val LightScheme = lightColorScheme(
     onSecondary = Color(0xFFFFF7EA),
     secondaryContainer = Color(0xFFEADFC6),
     onSecondaryContainer = Color(0xFF4A3A1E),
+    // Tertiary: a muted olive-gold, used sparingly (progress,
+    // tertiary accents) so it never fights the vermilion.
+    tertiary = Color(0xFF6B6A2F),
+    onTertiary = Color(0xFFFFF7EA),
+    tertiaryContainer = Color(0xFFE9E4BE),
+    onTertiaryContainer = Color(0xFF43421A),
+    error = Color(0xFFB3261E),
+    onError = Color(0xFFFFF7EA),
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF7A1A12),
     background = PaperCream,
     onBackground = InkBlack,
     surface = PaperCream,
@@ -39,8 +49,13 @@ private val LightScheme = lightColorScheme(
     surfaceContainerHighest = Color(0xFFE3D2AB),
     surfaceVariant = Color(0xFFEEE4CC),
     onSurfaceVariant = Color(0xFF554B38),
+    surfaceTint = Vermilion,
+    inverseSurface = Color(0xFF2E2A24),
+    inverseOnSurface = Color(0xFFF3ECDB),
+    inversePrimary = Color(0xFFF0A58C),
     outline = Color(0xFFCBBD9C),
-    outlineVariant = Color(0xFFE3D7BC)
+    outlineVariant = Color(0xFFE3D7BC),
+    scrim = Color(0xFF000000)
 )
 
 private val DarkScheme = darkColorScheme(
@@ -50,6 +65,14 @@ private val DarkScheme = darkColorScheme(
     onPrimaryContainer = Color(0xFFF6CDBB),
     secondary = Color(0xFFD9B98A),
     onSecondary = Color(0xFF3A2A12),
+    tertiary = Color(0xFFC4C48A),
+    onTertiary = Color(0xFF2E2E10),
+    tertiaryContainer = Color(0xFF4A4A22),
+    onTertiaryContainer = Color(0xFFE9E7C3),
+    error = Color(0xFFF2B8B5),
+    onError = Color(0xFF601410),
+    errorContainer = Color(0xFF8C1D18),
+    onErrorContainer = Color(0xFFF9DEDC),
     background = Color(0xFF171310),
     onBackground = Color(0xFFEFE6D2),
     surface = Color(0xFF171310),
@@ -61,8 +84,13 @@ private val DarkScheme = darkColorScheme(
     surfaceContainerHighest = Color(0xFF3D332A),
     surfaceVariant = Color(0xFF38302A),
     onSurfaceVariant = Color(0xFFCFC2A8),
+    surfaceTint = Color(0xFFE07856),
+    inverseSurface = Color(0xFFEFE6D2),
+    inverseOnSurface = Color(0xFF2E2A24),
+    inversePrimary = Color(0xFF8F2C15),
     outline = Color(0xFF5A5044),
-    outlineVariant = Color(0xFF3A332B)
+    outlineVariant = Color(0xFF3A332B),
+    scrim = Color(0xFF000000)
 )
 
 @Composable

@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +27,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,7 +59,7 @@ import java.net.URL
 /** Settings: theme, game defaults, data backup/restore and the
  *  manual update check — the app's only networking, and only when
  *  the user taps the button. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -179,33 +184,33 @@ fun SettingsScreen(
         }
     }
 
+    Scaffold(
+        topBar = { SubPageTopBar("设置", onBack) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        Text(
-            text = "设置",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(14.dp))
 
         SettingsCard(title = "外观") {
             Text("主题", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((value, label) in listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色")) {
-                    FilterChip(
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val options = listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色")
+                options.forEachIndexed { index, (value, label) ->
+                    SegmentedButton(
                         selected = themeMode == value,
                         onClick = {
                             themeMode = value
                             store.themeMode = value
                             onThemeChanged(value)
                         },
-                        label = { Text(label) }
-                    )
+                        shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                    ) { Text(label) }
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -249,31 +254,33 @@ fun SettingsScreen(
         SettingsCard(title = "对弈默认") {
             Text("默认难度", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (l in listOf("休闲", "普通", "高手")) {
-                    FilterChip(
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val options = listOf("休闲", "普通", "高手")
+                options.forEachIndexed { index, l ->
+                    SegmentedButton(
                         selected = level == l,
                         onClick = {
                             level = l
                             store.defaultLevelLabel = l
                         },
-                        label = { Text(l) }
-                    )
+                        shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                    ) { Text(l) }
                 }
             }
             Spacer(Modifier.height(12.dp))
             Text("默认棋钟", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((m, label) in listOf(0 to "不限时", 10 to "10 分钟", 20 to "20 分钟", 30 to "30 分钟")) {
-                    FilterChip(
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val options = listOf(0 to "不限时", 10 to "10 分钟", 20 to "20 分钟", 30 to "30 分钟")
+                options.forEachIndexed { index, (m, label) ->
+                    SegmentedButton(
                         selected = clock == m,
                         onClick = {
                             clock = m
                             store.defaultClockMinutes = m
                         },
-                        label = { Text(label) }
-                    )
+                        shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                    ) { Text(label) }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -373,8 +380,8 @@ fun SettingsScreen(
             )
         }
 
-        OutlinedButton(onClick = onBack) { Text("返回") }
         Spacer(Modifier.height(24.dp))
+    }
     }
 
     if (importOpen) {

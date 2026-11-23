@@ -14,6 +14,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -33,18 +34,17 @@ import com.tuxunxiangqi.android.xiangqi.Side
  *  computed by the same rules the game uses. */
 @Composable
 fun GuideScreen(onBack: () -> Unit) {
+    Scaffold(
+        topBar = { SubPageTopBar("新手指南", onBack) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        Text(
-            text = "新手指南",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(4.dp))
         Text(
             text = "每种棋子一节：小棋盘上被选中的就是它，圆点是它现在能走的格子——都是按真实规则算出来的。",
             style = MaterialTheme.typography.bodyMedium,
@@ -146,9 +146,8 @@ fun GuideScreen(onBack: () -> Unit) {
                 )
             }
         }
-        Spacer(Modifier.height(14.dp))
-        OutlinedButton(onClick = onBack) { Text("返回") }
         Spacer(Modifier.height(24.dp))
+    }
     }
 }
 

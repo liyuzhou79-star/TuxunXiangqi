@@ -3,6 +3,7 @@ package com.tuxunxiangqi.android.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +18,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,7 +56,7 @@ import kotlin.random.Random
 /** Guess-the-best-move trainer. Positions come from curated sets
  *  in three difficulties, from the user's own saved games, or from
  *  the wrong book. The engine's MultiPV top-4 is the answer key. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun GuessScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -313,38 +318,34 @@ fun GuessScreen(onBack: () -> Unit) {
         }
     }
 
+    Scaffold(
+        topBar = { SubPageTopBar("猜一选", onBack) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        Text(
-            text = "猜一选",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(4.dp))
         Text(
             text = "看局面，点你的子、再点落点，猜引擎的第一选择。猜错的题会进错题本，可以反复重练。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(10.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (s in listOf("简单", "普通", "困难", "我的棋谱", "错题本")) {
-                val countLabel = when (s) {
-                    "简单" -> "（" + GuessPositions.easy.size + " 题）"
-                    "普通" -> "（" + GuessPositions.normal.size + " 题）"
-                    "困难" -> "（" + GuessPositions.hard.size + " 题）"
-                    "我的棋谱" -> "（" + usableRecords + " 局）"
-                    else -> "（" + wrongList.size + " 题）"
-                }
-                FilterChip(
-                    selected = source == s,
-                    onClick = { source = s },
-                    label = { Text(s + countLabel) }
-                )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val options = listOf(
+                "简单" to "简单", "普通" to "普通", "困难" to "困难",
+                "我的棋谱" to "棋谱", "错题本" to "错题"
+            )
+            options.forEachIndexed { index, (value, label) ->
+                SegmentedButton(
+                    selected = source == value,
+                    onClick = { source = value },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                ) { Text(label) }
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -499,7 +500,7 @@ fun GuessScreen(onBack: () -> Unit) {
             Button(onClick = { newQuestion() }, enabled = !busy) {
                 Text("下一题")
             }
-            OutlinedButton(onClick = onBack) { Text("返回") }
+
         }
 
         Spacer(Modifier.height(20.dp))
@@ -544,5 +545,6 @@ fun GuessScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(8.dp))
         }
         Spacer(Modifier.height(24.dp))
+    }
     }
 }

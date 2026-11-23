@@ -18,6 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -122,7 +123,10 @@ fun EditorScreen(
                 title = { Text("摆棋编辑") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Text("←", fontSize = 22.sp)
+                        Icon(
+                                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回"
+                            )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

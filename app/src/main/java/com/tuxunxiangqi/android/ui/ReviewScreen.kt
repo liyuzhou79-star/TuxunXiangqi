@@ -21,6 +21,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -337,9 +338,14 @@ fun ReviewScreen(
         }
     }
 
+    Scaffold(
+        topBar = { SubPageTopBar("复盘", onBack) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(pageScroll)
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
@@ -915,9 +921,8 @@ fun ReviewScreen(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-        OutlinedButton(onClick = onBack) { Text("返回棋谱库") }
         Spacer(Modifier.height(24.dp))
+    }
     }
 }
 

@@ -23,7 +23,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -823,7 +827,10 @@ fun BoardScreen(
                     title = { Text(title) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Text("←", fontSize = 22.sp)
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回"
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -1223,17 +1230,18 @@ fun BoardScreen(
                         text = "棋钟（开局前选好）",
                         style = MaterialTheme.typography.titleSmall
                     )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (m in listOf(0, 10, 20, 30)) {
-                            FilterChip(
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        val options = listOf(0, 10, 20, 30)
+                        options.forEachIndexed { index, m ->
+                            SegmentedButton(
                                 selected = clockMinutes == m,
                                 onClick = {
                                     clockMinutes = m
                                     redMs = m * 60_000L
                                     blackMs = m * 60_000L
                                 },
-                                label = { Text(if (m == 0) "不限时" else "$m 分钟") }
-                            )
+                                shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                            ) { Text(if (m == 0) "不限时" else "$m 分") }
                         }
                     }
                 }
@@ -1588,28 +1596,26 @@ private fun SetupAiSection(
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
         Text(text = "你执哪一方？", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = humanSide == Side.RED,
-                onClick = { onSideChange(Side.RED) },
-                label = { Text("执红先行") }
-            )
-            FilterChip(
-                selected = humanSide == Side.BLACK,
-                onClick = { onSideChange(Side.BLACK) },
-                label = { Text("执黑后行（让先）") }
-            )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val options = listOf(Side.RED to "执红先行", Side.BLACK to "执黑后行")
+            options.forEachIndexed { index, (side, label) ->
+                SegmentedButton(
+                    selected = humanSide == side,
+                    onClick = { onSideChange(side) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                ) { Text(label) }
+            }
         }
         Spacer(Modifier.height(20.dp))
         Text(text = "引擎档位", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (lv in Level.entries) {
-                FilterChip(
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            Level.entries.forEachIndexed { index, lv ->
+                SegmentedButton(
                     selected = level == lv,
                     onClick = { onLevelChange(lv) },
-                    label = { Text(lv.label) }
-                )
+                    shape = SegmentedButtonDefaults.itemShape(index, Level.entries.size)
+                ) { Text(lv.label) }
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -1662,13 +1668,14 @@ private fun SetupAiSection(
         Spacer(Modifier.height(20.dp))
         Text(text = "棋钟", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (m in listOf(0, 10, 20, 30)) {
-                FilterChip(
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val options = listOf(0, 10, 20, 30)
+            options.forEachIndexed { index, m ->
+                SegmentedButton(
                     selected = clockMinutes == m,
                     onClick = { onClockChange(m) },
-                    label = { Text(if (m == 0) "不限时" else "$m 分钟") }
-                )
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                ) { Text(if (m == 0) "不限时" else "$m 分") }
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -1700,13 +1707,13 @@ private fun SetupSpectacleSection(
         Spacer(Modifier.height(20.dp))
         Text(text = "落子速度", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (sp in SpecSpeed.entries) {
-                FilterChip(
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SpecSpeed.entries.forEachIndexed { index, sp ->
+                SegmentedButton(
                     selected = specSpeed == sp,
                     onClick = { onSpeedChange(sp) },
-                    label = { Text(sp.label) }
-                )
+                    shape = SegmentedButtonDefaults.itemShape(index, SpecSpeed.entries.size)
+                ) { Text(sp.label) }
             }
         }
         Spacer(Modifier.height(24.dp))

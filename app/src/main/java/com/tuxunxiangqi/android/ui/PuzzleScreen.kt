@@ -4,11 +4,13 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,7 +19,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -49,7 +58,7 @@ import kotlinx.coroutines.delay
  *  engine defends Black and also referees — after each user move
  *  the evaluation must stay clearly winning, otherwise the move is
  *  flagged (but kept, with undo offered). Solved state persists. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PuzzleScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -65,9 +74,19 @@ fun PuzzleScreen(onBack: () -> Unit) {
     var diffFilter by remember { mutableStateOf<Int?>(null) }
     var unsolvedOnly by remember { mutableStateOf(false) }
 
+    Scaffold(
+        topBar = {
+            SubPageTopBar(
+                title = playing?.title ?: "残局题",
+                onBack = { if (playing != null) playing = null else onBack() }
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
     if (playing != null) {
         PuzzlePlay(
             puzzle = playing!!,
+            modifier = Modifier.padding(padding),
             onExit = { playing = null },
             onSolved = { id, steps, assisted ->
                 val next = solvedIds + id
@@ -101,15 +120,10 @@ fun PuzzleScreen(onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        Text(
-            text = "残局题",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(4.dp))
         Text(
             text = "全部是红先胜的经典子力残局。你执红，引擎执黑防守，还兼任裁判：哪一步把优势走没了，它会当场提醒。解出 " +
                 solvedIds.size + " / " + Puzzles.all.size + " 题。",
@@ -117,19 +131,25 @@ fun PuzzleScreen(onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(14.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = diffFilter == null,
-                onClick = { diffFilter = null },
-                label = { Text("全部难度") }
-            )
-            for ((tier, label) in listOf(1 to "★ 简单", 2 to "★★ 进阶", 3 to "★★★ 困难")) {
-                FilterChip(
+        Text(
+            text = "按难度筛选",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val options = listOf<Int?>(null, 1, 2, 3)
+            val labels = listOf("全部", "★", "★★", "★★★")
+            options.forEachIndexed { index, tier ->
+                SegmentedButton(
                     selected = diffFilter == tier,
                     onClick = { diffFilter = tier },
-                    label = { Text(label) }
-                )
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                ) { Text(labels[index]) }
             }
+        }
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = unsolvedOnly,
                 onClick = { unsolvedOnly = !unsolvedOnly },
@@ -183,69 +203,69 @@ fun PuzzleScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             for (p in group) {
             val solved = p.id in solvedIds
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = if (solved) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    }
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+            ListItem(
+                headlineContent = {
                     Text(
                         text = (if (p.id == daily.id) "今日一题 · " else "") + p.title +
                             " · 难度 " + "★".repeat(Puzzles.difficultyOf(p.id)) +
                             if (solved) "（已解出）" else "",
-                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = p.hint,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                supportingContent = {
+                    Column {
+                        Text(text = p.hint)
+                        if (solved) {
+                            val best = prefs.getInt("best_${p.id}", 0)
+                            if (best > 0) {
+                                Text(
+                                    text = "最佳成绩：$best 步解出",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            if (prefs.getBoolean("assisted_${p.id}", false)) {
+                                Text(
+                                    text = "这道题用过提示解出——不用提示再解一次，这个标记就会去掉。"
+                                )
+                            }
+                        }
+                    }
+                },
+                leadingContent = if (solved) {
+                    {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Filled.CheckCircle,
+                            contentDescription = "已解出",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else {
+                    null
+                },
+                trailingContent = {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (solved) {
-                        val best = prefs.getInt("best_${p.id}", 0)
-                        if (best > 0) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "最佳成绩：$best 步解出",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        if (prefs.getBoolean("assisted_${p.id}", false)) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "这道题用过提示解出——不用提示再解一次，这个标记就会去掉。",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    OutlinedButton(onClick = { playing = p }) {
-                        Text(if (solved) "再解一次" else "开始解题")
-                    }
-                }
-            }
-            Spacer(Modifier.height(10.dp))
+                },
+                modifier = Modifier.clickable { playing = p }
+            )
+            HorizontalDivider()
             }
             Spacer(Modifier.height(8.dp))
         }
-        OutlinedButton(onClick = onBack) { Text("返回") }
         Spacer(Modifier.height(24.dp))
+    }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun PuzzlePlay(
     puzzle: Puzzle,
+    modifier: Modifier = Modifier,
     onExit: () -> Unit,
     /** steps = the user's own move count on a genuine solve;
      *  null when the demo solved it (never a personal best).
@@ -465,17 +485,11 @@ private fun PuzzlePlay(
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        Text(
-            text = puzzle.title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(2.dp))
         Text(
             text = "红先胜 · " + puzzle.hint,
             style = MaterialTheme.typography.bodyMedium,
@@ -575,7 +589,6 @@ private fun PuzzlePlay(
                 },
                 enabled = !busy || demoOn
             ) { Text(if (demoOn) "停止演示" else "看正解演示") }
-            OutlinedButton(onClick = onExit) { Text("回题目列表") }
         }
         Spacer(Modifier.height(24.dp))
     }

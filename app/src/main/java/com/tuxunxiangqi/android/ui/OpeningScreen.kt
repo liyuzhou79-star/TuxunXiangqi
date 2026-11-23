@@ -17,6 +17,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -84,18 +85,17 @@ fun OpeningScreen(
         scope.launch { scrollState.animateScrollTo(0) }
     }
 
+    Scaffold(
+        topBar = { SubPageTopBar("开局库", onBack) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        Text(
-            text = "开局库",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(4.dp))
         Text(
             text = "内置定式共 " + allNodes.size + " 个节点、" + totalSuggestions +
                 " 条建议着法，对局分析时也会自动引用。点任意一条线，" +
@@ -211,8 +211,7 @@ fun OpeningScreen(
             }
             Spacer(Modifier.height(8.dp))
         }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onBack) { Text("返回") }
         Spacer(Modifier.height(24.dp))
+    }
     }
 }
