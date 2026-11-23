@@ -155,17 +155,23 @@ fun HomeScreen(
         // itself says whether today's puzzle is already done
         // (1.21.0): 0 = not solved, 1 = solved, 2 = solved with a
         // hint (PuzzleScreen's assisted_<id> flag).
-        val dailyState = remember(daily.id) {
+        val (dailyState, dailyStreakDays) = remember(daily.id) {
             val prefs = homeContext.getSharedPreferences(
                 "puzzles", android.content.Context.MODE_PRIVATE
             )
             val solved = prefs.getStringSet("solved", emptySet()).orEmpty()
                 .mapNotNull { it.toIntOrNull() }.toSet()
-            when {
+            val state = when {
                 daily.id !in solved -> 0
                 prefs.getBoolean("assisted_" + daily.id, false) -> 2
                 else -> 1
             }
+            val days = prefs.getStringSet("daily_days", emptySet()).orEmpty()
+                .mapNotNull { it.toLongOrNull() }.toSet()
+            val streak = com.tuxunxiangqi.android.data.dailyStreak(
+                days, java.time.LocalDate.now().toEpochDay()
+            )
+            state to streak
         }
         Card(
             colors = CardDefaults.cardColors(
@@ -196,6 +202,14 @@ fun HomeScreen(
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                if (dailyStreakDays >= 2) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "每日一题已连续完成 " + dailyStreakDays + " 天",
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }

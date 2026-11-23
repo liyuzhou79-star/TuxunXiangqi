@@ -2,6 +2,7 @@ package com.tuxunxiangqi.android
 
 import com.tuxunxiangqi.android.data.GuessStat
 import com.tuxunxiangqi.android.data.PuzzleProgress
+import com.tuxunxiangqi.android.data.dailyStreak
 import com.tuxunxiangqi.android.data.encodeGuessStats
 import com.tuxunxiangqi.android.data.parseGuessStats
 import com.tuxunxiangqi.android.data.parsePuzzleProgress
@@ -36,6 +37,46 @@ class TrainingBackupCodecTest {
             PuzzleProgress(solvedIds = setOf(2, 7)),
             parsePuzzleProgress("s=2,7")
         )
+    }
+
+    @Test
+    fun puzzleProgressDailyDaysRoundTrip() {
+        val p = PuzzleProgress(
+            solvedIds = setOf(3),
+            dailyDays = setOf(20601L, 20600L)
+        )
+        assertEquals("s=3;d=20600,20601", p.encode())
+        assertEquals(p, parsePuzzleProgress(p.encode()))
+        // A pre-1.28 backup line has no "d" section: days parse
+        // empty, everything else intact.
+        assertEquals(
+            PuzzleProgress(solvedIds = setOf(3)),
+            parsePuzzleProgress("s=3")
+        )
+    }
+
+    @Test
+    fun dailyStreakCountsBackFromToday() {
+        val today = 20610L
+        assertEquals(0, dailyStreak(emptySet(), today))
+        assertEquals(1, dailyStreak(setOf(today), today))
+        assertEquals(
+            3,
+            dailyStreak(setOf(today, today - 1, today - 2), today)
+        )
+        // A gap breaks the run.
+        assertEquals(
+            2,
+            dailyStreak(setOf(today, today - 1, today - 3), today)
+        )
+        // Today not done yet: the streak through yesterday is
+        // still alive.
+        assertEquals(
+            2,
+            dailyStreak(setOf(today - 1, today - 2), today)
+        )
+        // Yesterday also missing: streak is over.
+        assertEquals(0, dailyStreak(setOf(today - 2), today))
     }
 
     @Test

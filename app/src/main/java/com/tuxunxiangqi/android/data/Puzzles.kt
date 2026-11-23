@@ -280,7 +280,7 @@ object Puzzles {
 }
 
 /** Curated positions for the guess-the-best-move trainer, grouped
- *  by difficulty (8 per tier since 1.5.0). The engine's top move
+ *  by difficulty (12 per tier since 1.28.0). The engine's top move
  *  is the answer; the position only needs to be interesting, not
  *  forced. The endgame entries reuse Puzzles faces verbatim, so
  *  they inherit the same FEN sanity coverage in PuzzleFenTest. */
@@ -293,7 +293,11 @@ object GuessPositions {
         "双车带兵局面" to "2bakab2/9/R7R/4P4/9/9/9/9/9/4K4 w - - 0 1",
         "双车马对士象全" to "2bakab2/9/9/3N5/R8/8R/9/9/9/3K5 w - - 0 1",
         "双车炮兵齐攻" to "2bakab2/9/9/3P5/9/R7R/4C4/9/9/4K4 w - - 0 1",
-        "车马炮联攻局面" to "2bakab2/9/3R5/4N4/4C4/9/9/9/9/4K4 w - - 0 1"
+        "车马炮联攻局面" to "2bakab2/9/3R5/4N4/4C4/9/9/9/9/4K4 w - - 0 1",
+        "单车对马双士局面" to "3aka3/9/9/2n6/9/9/9/3R5/9/3K5 w - - 0 1",
+        "马炮兵对单马局面" to "4k4/9/9/2n1N4/4P4/9/4C4/9/9/3K5 w - - 0 1",
+        "双车胜士象全局面" to "2bakab2/9/9/9/9/9/9/9/3R3R1/3K5 w - - 0 1",
+        "车兵对单炮局面" to "4k4/9/7c1/4P4/9/2R6/9/9/9/4K4 w - - 0 1"
     )
     val normal: List<Pair<String, String>> = listOf(
         "标准开局" to
@@ -305,7 +309,11 @@ object GuessPositions {
         "车炮胜士象全" to "2bakab2/9/9/9/4C4/9/9/3R5/9/4K4 w - - 0 1",
         "车炮兵攻士象全" to "2bakab2/9/9/4P4/9/4C4/9/3R5/9/4K4 w - - 0 1",
         "马炮兵对士象全" to "2bakab2/9/9/3NP4/9/4C4/9/9/9/3K5 w - - 0 1",
-        "双车对马炮" to "4k4/9/2n3c2/9/8R/9/R8/9/9/3K5 w - - 0 1"
+        "双车对马炮" to "4k4/9/2n3c2/9/8R/9/R8/9/9/3K5 w - - 0 1",
+        "车马双兵对士象全" to "2bakab2/9/9/6N2/3P1P3/2R6/9/9/9/3K5 w - - 0 1",
+        "车马炮胜士象全" to "2bakab2/9/9/4N4/4C4/9/9/9/5R3/4K4 w - - 0 1",
+        "车炮双兵压宫" to "2bakab2/9/9/3P1P3/9/3R5/7C1/9/9/3K5 w - - 0 1",
+        "马双炮带兵" to "2bakab2/9/9/4P4/4N4/7C1/1C7/9/9/4K4 w - - 0 1"
     )
     val hard: List<Pair<String, String>> = listOf(
         "单车对马炮" to "4k4/9/2c6/6n2/4R4/9/9/9/9/4K4 w - - 0 1",
@@ -315,7 +323,11 @@ object GuessPositions {
         "双马胜士象全" to "2bakab2/9/2N3N2/9/9/9/9/9/9/3K5 w - - 0 1",
         "单车胜士象全" to "2bakab2/9/9/9/9/9/9/3R5/9/3K5 w - - 0 1",
         "双炮胜士象全" to "2bakab2/9/9/9/2C3C2/9/9/9/9/3K5 w - - 0 1",
-        "单车对炮双士" to "3aka3/9/9/9/4c4/9/R8/9/9/4K4 w - - 0 1"
+        "单车对炮双士" to "3aka3/9/9/9/4c4/9/R8/9/9/4K4 w - - 0 1",
+        "车马对双炮双士" to "3aka3/9/1c5c1/9/5N3/2R6/9/9/9/3K5 w - - 0 1",
+        "车带三兵胜士象全" to "2bakab2/9/9/4P4/1RP3P2/9/9/9/9/4K4 w - - 0 1",
+        "双马炮对士象全" to "2bakab2/9/2N3N2/9/9/9/4C4/9/9/4K4 w - - 0 1",
+        "车马对马士象" to "2bakab2/9/7R1/3n5/4N4/9/9/9/9/4K4 w - - 0 1"
     )
 }
 

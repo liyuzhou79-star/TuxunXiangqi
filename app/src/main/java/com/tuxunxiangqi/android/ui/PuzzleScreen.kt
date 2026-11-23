@@ -112,6 +112,17 @@ fun PuzzleScreen(onBack: () -> Unit) {
                         editor.remove("assisted_$id")
                     }
                 }
+                // Solving today's daily puzzle also stamps the
+                // day for the streak on the home card (1.28.0).
+                val todayDailyId = Puzzles.daily(
+                    Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+                ).id
+                if (id == todayDailyId) {
+                    val days = prefs.getStringSet("daily_days", emptySet())
+                        .orEmpty().toMutableSet()
+                    days += java.time.LocalDate.now().toEpochDay().toString()
+                    editor.putStringSet("daily_days", days)
+                }
                 editor.apply()
             }
         )

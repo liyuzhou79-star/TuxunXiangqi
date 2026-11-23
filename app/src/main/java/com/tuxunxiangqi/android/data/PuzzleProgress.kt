@@ -14,10 +14,14 @@ import android.content.Context
 data class PuzzleProgress(
     val solvedIds: Set<Int> = emptySet(),
     val assistedIds: Set<Int> = emptySet(),
-    val bestMoves: Map<Int, Int> = emptyMap()
+    val bestMoves: Map<Int, Int> = emptyMap(),
+    /** Epoch days on which the daily puzzle was solved
+     *  (1.28.0); drives the streak shown on the home card. */
+    val dailyDays: Set<Long> = emptySet()
 ) {
     /** Compact portable form for the backup document:
-     *  "s=1,5,9;a=5;b=1:23,9:31" (solved / assisted / best). */
+     *  "s=1,5,9;a=5;b=1:23,9:31;d=20600,20601"
+     *  (solved / assisted / best / daily-solved days). */
     fun encode(): String {
         val sb = StringBuilder()
         sb.append("s=").append(solvedIds.sorted().joinToString(","))
@@ -30,8 +34,25 @@ data class PuzzleProgress(
                     .joinToString(",") { "${it.key}:${it.value}" }
             )
         }
+        if (dailyDays.isNotEmpty()) {
+            sb.append(";d=").append(dailyDays.sorted().joinToString(","))
+        }
         return sb.toString()
     }
+}
+
+/** Current daily-puzzle streak: consecutive solved days ending
+ *  today, or ending yesterday when today is not solved yet (the
+ *  streak is still alive until the day ends). Pure, pinned by
+ *  unit tests. */
+fun dailyStreak(days: Set<Long>, todayEpochDay: Long): Int {
+    var streak = 0
+    var day = if (todayEpochDay in days) todayEpochDay else todayEpochDay - 1
+    while (day in days) {
+        streak++
+        day--
+    }
+    return streak
 }
 
 /** Parses the [PuzzleProgress.encode] form back. Tolerant of
@@ -44,6 +65,7 @@ fun parsePuzzleProgress(text: String): PuzzleProgress? {
     var solved: Set<Int>? = null
     val assisted = mutableSetOf<Int>()
     val best = mutableMapOf<Int, Int>()
+    val days = mutableSetOf<Long>()
     var sawSection = false
     for (part in t.split(';')) {
         val eq = part.indexOf('=')
@@ -72,10 +94,15 @@ fun parsePuzzleProgress(text: String): PuzzleProgress? {
                     }
                 }
             }
+            "d" -> {
+                sawSection = true
+                days += value.split(',')
+                    .mapNotNull { it.trim().toLongOrNull() }
+            }
         }
     }
     if (!sawSection) return null
-    return PuzzleProgress(solved ?: emptySet(), assisted, best)
+    return PuzzleProgress(solved ?: emptySet(), assisted, best, days)
 }
 
 /** Reads and replaces the puzzle progress in the same
@@ -103,7 +130,19 @@ class PuzzleProgressStore(context: Context) {
                     }
             }
         }
-        return PuzzleProgress(solved, assisted, best)
+        val days = prefs.getStringSet("daily_days", emptySet()).orEmpty()
+            .mapNotNull { it.toLongOrNull() }.toSet()
+        return PuzzleProgress(solved, assisted, best, days)
+    }
+
+    /** Records that the daily puzzle was solved on the given
+     *  epoch day (idempotent; stored as the "daily_days" string
+     *  set in the same preferences file PuzzleScreen writes). */
+    fun recordDailySolved(epochDay: Long) {
+        val days = prefs.getStringSet("daily_days", emptySet()).orEmpty().toMutableSet()
+        if (days.add(epochDay.toString())) {
+            prefs.edit().putStringSet("daily_days", days).apply()
+        }
     }
 
     fun replaceAll(progress: PuzzleProgress) {
@@ -118,6 +157,13 @@ class PuzzleProgressStore(context: Context) {
         e.putStringSet("solved", progress.solvedIds.map { it.toString() }.toSet())
         for (id in progress.assistedIds) e.putBoolean("assisted_$id", true)
         for ((id, moves) in progress.bestMoves) e.putInt("best_$id", moves)
+        // Daily days ride along only when the backup carries
+        // them: a pre-1.28 backup has no "d" section and must not
+        // wipe the streak recorded on this device (the same
+        // field-missing rule the whole progress block follows).
+        if (progress.dailyDays.isNotEmpty()) {
+            e.putStringSet("daily_days", progress.dailyDays.map { it.toString() }.toSet())
+        }
         e.apply()
     }
 }
