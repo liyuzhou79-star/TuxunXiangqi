@@ -267,6 +267,19 @@ object Puzzles {
     /** The daily puzzle: stable within a day, rotates over the set. */
     fun daily(dayOfYear: Int): Puzzle = all.sortedBy { it.id }[dayOfYear % all.size]
 
+    /** The daily puzzle of a specific calendar date, given as
+     *  an epoch day (1.32.0). Uses that date's own day-of-year,
+     *  so it always names the puzzle the app showed (or will
+     *  show) on that date — the basis for catching up on missed
+     *  dailies. */
+    fun dailyForEpochDay(epochDay: Long): Puzzle =
+        daily(java.time.LocalDate.ofEpochDay(epochDay).dayOfYear)
+
+    /** The epoch days of the last [count] daily puzzles,
+     *  today first (1.32.0). */
+    fun recentDailyDays(todayEpochDay: Long, count: Int = 7): List<Long> =
+        (0 until count).map { todayEpochDay - it }
+
     /** Display grouping by the lead attacking material, in the
      *  order the list page shows them. */
     val categoryOrder: List<String> =

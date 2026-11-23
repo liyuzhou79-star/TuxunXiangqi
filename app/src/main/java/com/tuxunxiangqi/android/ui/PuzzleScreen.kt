@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.Puzzle
 import com.tuxunxiangqi.android.data.Puzzles
+import com.tuxunxiangqi.android.data.dailyStreak
 import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.engine.SoundFx
 import com.tuxunxiangqi.android.engine.SoundKind
@@ -72,6 +73,19 @@ fun PuzzleScreen(onBack: () -> Unit) {
         mutableStateOf(prefs.getStringSet("solved", emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet())
     }
     var playing by remember { mutableStateOf<Puzzle?>(null) }
+    // Daily catch-up (1.32.0): the epoch day the currently
+    // played puzzle was launched as, when it came from the
+    // 近 7 天 daily strip; solving stamps THAT day, so a missed
+    // daily can still be completed for its own date. Null for
+    // ordinary list/random launches (today's daily still stamps
+    // today via the id check in onSolved).
+    var playingDailyDay by remember { mutableStateOf<Long?>(null) }
+    var dailyDays by remember {
+        mutableStateOf(
+            prefs.getStringSet("daily_days", emptySet()).orEmpty()
+                .mapNotNull { it.toLongOrNull() }.toSet()
+        )
+    }
     // List filters (1.19.0): one difficulty tier at a time, plus
     // an unsolved-only toggle for working through what's left.
     var diffFilter by remember { mutableStateOf<Int?>(null) }
@@ -81,7 +95,14 @@ fun PuzzleScreen(onBack: () -> Unit) {
         topBar = {
             SubPageTopBar(
                 title = playing?.title ?: "残局题",
-                onBack = { if (playing != null) playing = null else onBack() }
+                onBack = {
+                    if (playing != null) {
+                        playing = null
+                        playingDailyDay = null
+                    } else {
+                        onBack()
+                    }
+                }
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -90,7 +111,10 @@ fun PuzzleScreen(onBack: () -> Unit) {
         PuzzlePlay(
             puzzle = playing!!,
             modifier = Modifier.padding(padding),
-            onExit = { playing = null },
+            onExit = {
+                playing = null
+                playingDailyDay = null
+            },
             onSolved = { id, steps, assisted ->
                 val next = solvedIds + id
                 solvedIds = next
@@ -112,16 +136,27 @@ fun PuzzleScreen(onBack: () -> Unit) {
                         editor.remove("assisted_$id")
                     }
                 }
-                // Solving today's daily puzzle also stamps the
-                // day for the streak on the home card (1.28.0).
-                val todayDailyId = Puzzles.daily(
-                    Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
-                ).id
-                if (id == todayDailyId) {
-                    val days = prefs.getStringSet("daily_days", emptySet())
-                        .orEmpty().toMutableSet()
-                    days += java.time.LocalDate.now().toEpochDay().toString()
-                    editor.putStringSet("daily_days", days)
+                // Solving a daily puzzle stamps its day for
+                // the streak (1.28.0): the day it was launched
+                // as from the daily strip (1.32.0 catch-up), or
+                // today when the solved puzzle is today's daily
+                // however it was launched.
+                val stampDay = playingDailyDay ?: run {
+                    val todayDailyId = Puzzles.daily(
+                        Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+                    ).id
+                    if (id == todayDailyId) {
+                        java.time.LocalDate.now().toEpochDay()
+                    } else {
+                        null
+                    }
+                }
+                if (stampDay != null) {
+                    val days = dailyDays + stampDay
+                    dailyDays = days
+                    editor.putStringSet(
+                        "daily_days", days.map { it.toString() }.toSet()
+                    )
                 }
                 editor.apply()
             }
@@ -143,6 +178,94 @@ fun PuzzleScreen(onBack: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Spacer(Modifier.height(14.dp))
+        // Daily catch-up strip (1.32.0): the last seven dailies
+        // with their completion state. Solving one stamps its
+        // own date, so a missed day can still join the streak —
+        // but only its own date: skipping yesterday and solving
+        // today's does not backfill yesterday.
+        val todayEpoch = java.time.LocalDate.now().toEpochDay()
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                Text(
+                    text = "每日一题 · 近 7 天",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+                Text(
+                    text = "错过的可以补做：补做哪天的题，就按哪天记，连续天数能接上。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                val streakNow = dailyStreak(dailyDays, todayEpoch)
+                if (streakNow > 0) {
+                    Text(
+                        text = "当前连续完成 $streakNow 天",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                for (epochDay in Puzzles.recentDailyDays(todayEpoch)) {
+                    val date = java.time.LocalDate.ofEpochDay(epochDay)
+                    val p = Puzzles.dailyForEpochDay(epochDay)
+                    val done = epochDay in dailyDays
+                    val dateLabel = when (epochDay) {
+                        todayEpoch -> "今天"
+                        todayEpoch - 1 -> "昨天"
+                        else -> "" + date.monthValue + "月" + date.dayOfMonth + "日"
+                    }
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = dateLabel + " · " + p.title,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        },
+                        supportingContent = {
+                            Text(text = if (done) "已完成" else "还没解")
+                        },
+                        leadingContent = if (done) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = "已完成",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                        trailingContent = {
+                            Icon(
+                                imageVector = Icons.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        colors = androidx.compose.material3.ListItemDefaults.colors(
+                            containerColor = androidx.compose.ui.graphics.Color.Transparent
+                        ),
+                        modifier = Modifier.clickable {
+                            playingDailyDay = epochDay
+                            playing = p
+                        }
+                    )
+                    if (epochDay != todayEpoch - 6) {
+                        HorizontalDivider()
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(14.dp))
         Text(
             text = "按难度筛选",
@@ -180,7 +303,10 @@ fun PuzzleScreen(onBack: () -> Unit) {
             onClick = {
                 val unsolved = shownPuzzles.filter { it.id !in solvedIds }
                 val pool = if (unsolved.isNotEmpty()) unsolved else shownPuzzles
-                if (pool.isNotEmpty()) playing = pool.random()
+                if (pool.isNotEmpty()) {
+                    playingDailyDay = null
+                    playing = pool.random()
+                }
             },
             enabled = shownPuzzles.isNotEmpty()
         ) { Text("随手来一题（优先未解）") }
@@ -263,7 +389,10 @@ fun PuzzleScreen(onBack: () -> Unit) {
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
-                modifier = Modifier.clickable { playing = p }
+                modifier = Modifier.clickable {
+                    playingDailyDay = null
+                    playing = p
+                }
             )
             HorizontalDivider()
             }
