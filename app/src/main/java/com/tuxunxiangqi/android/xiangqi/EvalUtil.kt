@@ -68,6 +68,39 @@ object EvalUtil {
         return out
     }
 
+    /** 1-based rank of [uci] in a candidate list given as UCI
+     *  moves in rank order, or null when the move is not there. */
+    fun rankOfMove(candidateUcis: List<String>, uci: String): Int? {
+        val i = candidateUcis.indexOf(uci)
+        return if (i >= 0) i + 1 else null
+    }
+
+    /** Flattens a score to one number for comparisons: mate
+     *  scores become ±1500, the same cap the trend chart uses. */
+    fun flatScore(cp: Int?, mateIn: Int?): Int? {
+        if (cp != null) return cp
+        if (mateIn != null) return if (mateIn > 0) 1500 else -1500
+        return null
+    }
+
+    /**
+     * How much a candidate move gives away against the engine's
+     * best line at the same position, in centipawns from the
+     * mover's point of view (both scores are side-to-move scores
+     * of that position). Positive means worse than the best move;
+     * null when either score is missing.
+     */
+    fun lossVsBestCp(
+        bestCp: Int?,
+        bestMate: Int?,
+        moveCp: Int?,
+        moveMate: Int?
+    ): Int? {
+        val best = flatScore(bestCp, bestMate) ?: return null
+        val move = flatScore(moveCp, moveMate) ?: return null
+        return best - move
+    }
+
     /** Plain-language summary of a Red-perspective score. */
     fun describeRed(cp: Int?, mateIn: Int?): String {
         if (mateIn != null) {

@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
+import com.tuxunxiangqi.android.engine.AnalysisResult
 import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
@@ -102,6 +103,16 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     var batchDone by remember { mutableStateOf(0) }
     var batchNote by remember { mutableStateOf<String?>(null) }
     val batchCancel = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+
+    // Single-step deep analysis: one position gets a long,
+    // four-candidate look (2 s MultiPV 4). It and the whole-game
+    // batch run exclude each other so the two never fight over
+    // the one resident engine. The result lives in memory only —
+    // it is never written back into the stored record.
+    var deepBusy by remember { mutableStateOf(false) }
+    var deepIdx by remember { mutableStateOf(-1) }
+    var deepResult by remember { mutableStateOf<AnalysisResult?>(null) }
+    var deepError by remember { mutableStateOf<String?>(null) }
 
     fun startBatchAnalysis() {
         if (batchRunning || maxIdx == 0) return
@@ -175,6 +186,24 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         gs
     }
 
+    fun startDeepAnalysis() {
+        if (deepBusy || batchRunning) return
+        deepBusy = true
+        deepError = null
+        deepResult = null
+        deepIdx = idx
+        val atIdx = idx
+        engine.analyze(Fen.toFen(displayState), 2000, multiPv = 4) { res, err ->
+            deepBusy = false
+            if (deepIdx != atIdx) return@analyze
+            when {
+                err != null -> deepError = err
+                res != null -> deepResult = res
+                else -> deepError = "引擎暂时没给出候选。"
+            }
+        }
+    }
+
     // Recorded evals as (moveCount, redCp) points for the chart.
     val trendPoints = remember(liveRecord.evals) {
         liveRecord.evals.entries.sortedBy { it.key }.map { it.key to it.value }
@@ -245,7 +274,13 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                 state = displayState,
                 selected = null,
                 legalTargets = emptyList(),
-                hint = null,
+                hint = if (deepIdx == idx) {
+                    deepResult?.candidates?.firstOrNull()?.let {
+                        Fen.parseUciMove(it.moveUci)
+                    }
+                } else {
+                    null
+                },
                 onTap = {}
             )
         }
@@ -345,7 +380,7 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = { startBatchAnalysis() },
-                        enabled = !batchRunning && maxIdx > 0
+                        enabled = !batchRunning && !deepBusy && maxIdx > 0
                     ) { Text("整局分析") }
                     if (batchRunning) {
                         OutlinedButton(onClick = { batchCancel.set(true) }) {
@@ -384,6 +419,133 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                         text = batchNote!!,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                }
+                Spacer(Modifier.height(12.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { startDeepAnalysis() },
+                        enabled = !deepBusy && !batchRunning
+                    ) { Text("深度分析这一步") }
+                }
+                if (deepBusy && deepIdx == idx) {
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "引擎正在深算这一步（约 2 秒，看前四个候选）……",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (deepIdx == idx && deepError != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "深析没能完成：$deepError",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                val deep = if (deepIdx == idx) deepResult else null
+                if (deep != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor =
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = if (idx == 0) {
+                                    "初始局面深析（引擎看了约 2 秒）"
+                                } else {
+                                    "第 $idx 步局面深析（引擎看了约 2 秒）"
+                                },
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            for (cand in deep.candidates) {
+                                val mv = Fen.parseUciMove(cand.moveUci)
+                                val title = if (mv != null) {
+                                    Notation.moveText(
+                                        displayState.cells, mv.first, mv.second
+                                    )
+                                } else {
+                                    cand.moveUci
+                                }
+                                val (redCp, redMate) = EvalUtil.toRedPerspective(
+                                    cand.scoreCp, cand.mateIn, displayState.turn
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = "第 ${cand.rank} 选：$title · " +
+                                        EvalUtil.describeRed(redCp, redMate),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                val pv = Notation.pvText(
+                                    displayState.cells, cand.pvUci, 5
+                                ).joinToString(" ")
+                                if (pv.isNotBlank()) {
+                                    Text(
+                                        text = "变化：$pv",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme
+                                            .colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            val actualUci = liveRecord.movesUci.getOrNull(idx)
+                            if (actualUci != null) {
+                                val actualText = notations.getOrNull(idx)
+                                    ?: actualUci
+                                val rank = EvalUtil.rankOfMove(
+                                    deep.candidates.map { it.moveUci }, actualUci
+                                )
+                                val verdict = when {
+                                    rank == 1 ->
+                                        "实战的「$actualText」正是深析一选。"
+                                    rank != null -> {
+                                        val bestCand = deep.candidates.first()
+                                        val playedCand = deep.candidates[rank - 1]
+                                        val loss = EvalUtil.lossVsBestCp(
+                                            bestCand.scoreCp, bestCand.mateIn,
+                                            playedCand.scoreCp, playedCand.mateIn
+                                        )
+                                        "实战的「$actualText」是深析第 $rank 选" +
+                                            (loss?.let {
+                                                "，比一选差约合 " +
+                                                    String.format("%.1f", it / 100.0) +
+                                                    " 个兵。"
+                                            } ?: "。")
+                                    }
+                                    else -> {
+                                        val storedLoss = EvalUtil.moveLossCp(
+                                            liveRecord.evals, snapshots[0].second,
+                                            idx + 1
+                                        )
+                                        "实战的「$actualText」没进深析前四" +
+                                            (storedLoss?.let {
+                                                "；按整局分析的评分，这手掉了约合 " +
+                                                    String.format("%.1f", it / 100.0) +
+                                                    " 个兵。"
+                                            } ?: "。")
+                                    }
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = verdict,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = "深析结果只在这页临时看，不会存进棋谱。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -64,7 +64,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
         PuzzlePlay(
             puzzle = playing!!,
             onExit = { playing = null },
-            onSolved = { id, steps ->
+            onSolved = { id, steps, assisted ->
                 val next = solvedIds + id
                 solvedIds = next
                 val editor = prefs.edit()
@@ -74,6 +74,16 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 if (steps != null && steps > 0) {
                     val old = prefs.getInt("best_$id", 0)
                     if (old == 0 || steps < old) editor.putInt("best_$id", steps)
+                }
+                // A solve that used the hint button carries a
+                // visible mark until the user re-solves the puzzle
+                // cleanly, which clears it again.
+                if (steps != null) {
+                    if (assisted) {
+                        editor.putBoolean("assisted_$id", true)
+                    } else {
+                        editor.remove("assisted_$id")
+                    }
                 }
                 editor.apply()
             }
@@ -151,6 +161,14 @@ fun PuzzleScreen(onBack: () -> Unit) {
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
+                        if (prefs.getBoolean("assisted_${p.id}", false)) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "这道题用过提示解出——不用提示再解一次，这个标记就会去掉。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     Spacer(Modifier.height(10.dp))
                     OutlinedButton(onClick = { playing = p }) {
@@ -173,8 +191,9 @@ private fun PuzzlePlay(
     puzzle: Puzzle,
     onExit: () -> Unit,
     /** steps = the user's own move count on a genuine solve;
-     *  null when the demo solved it (never a personal best). */
-    onSolved: (Int, Int?) -> Unit
+     *  null when the demo solved it (never a personal best).
+     *  assisted = the solving attempt used the hint button. */
+    onSolved: (Int, Int?, Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val bestBefore = remember(puzzle.id) {
@@ -198,6 +217,36 @@ private fun PuzzlePlay(
     var solved by remember { mutableStateOf(false) }
     var demoOn by remember { mutableStateOf(false) }
     var lastJudge by remember { mutableStateOf<String?>(null) }
+    // Hint button: at most three hints per attempt. The engine's
+    // top move is shown as a board arrow plus its notation; using
+    // any hint marks the eventual solve as assisted.
+    var hintsLeft by remember(puzzle.id) { mutableStateOf(3) }
+    var usedHint by remember(puzzle.id) { mutableStateOf(false) }
+    var hintBusy by remember { mutableStateOf(false) }
+    var hintMove by remember(puzzle.id) { mutableStateOf<Pair<Pos, Pos>?>(null) }
+
+    fun askHint() {
+        if (busy || demoOn || hintBusy || hintsLeft <= 0) return
+        if (gs.result != null || gs.turn != Side.RED) return
+        hintBusy = true
+        status = "引擎正在想一步好棋……"
+        engine.analyze(Fen.toFen(gs), 800, multiPv = 1) { res, err ->
+            hintBusy = false
+            val best = res?.candidates?.firstOrNull()
+            val mv = best?.let { Fen.parseUciMove(it.moveUci) }
+            if (mv != null) {
+                hintsLeft--
+                usedHint = true
+                hintMove = mv
+                val text = Notation.moveText(gs.cells, mv.first, mv.second)
+                status = "提示：试试走「$text」。" +
+                    if (hintsLeft > 0) "这轮还剩 $hintsLeft 次提示。" else "提示次数用完了。"
+            } else {
+                status = "引擎这次没能给出提示" +
+                    (err?.let { "：$it" } ?: "。") + "次数没扣，再试一次。"
+            }
+        }
+    }
 
     // Move sounds, same rule as the game screen: only when the
     // move count grows (undo stays silent), check outranks capture.
@@ -224,16 +273,18 @@ private fun PuzzlePlay(
             userMoves == bestBefore -> "追平了你的最佳成绩。"
             else -> "你的最佳是 $bestBefore 步，下次试着更快解出。"
         }
-        return "解出来了！共用 $userMoves 步。黑方" + gs.result!!.reason + "。" + bestNote
+        return "解出来了！共用 $userMoves 步。黑方" + gs.result!!.reason + "。" + bestNote +
+            if (usedHint) "这轮用过提示，题目列表里会如实标出来。" else ""
     }
 
     fun afterUserMove() {
         userMoves++
         selected = null
+        hintMove = null
         if (gs.result != null) {
             if (gs.result!!.winner == Side.RED) {
                 solved = true
-                onSolved(puzzle.id, userMoves)
+                onSolved(puzzle.id, userMoves, usedHint)
                 SoundFx.play(context, SoundKind.MATE_VOICE)
                 status = solvedStatus()
             } else {
@@ -268,7 +319,7 @@ private fun PuzzlePlay(
                         status = "黑方走了「$text」。" + (lastJudge ?: "")
                         if (gs.result != null && gs.result!!.winner == Side.RED) {
                             solved = true
-                            onSolved(puzzle.id, userMoves)
+                            onSolved(puzzle.id, userMoves, usedHint)
                             SoundFx.play(context, SoundKind.MATE_VOICE)
                             status = solvedStatus()
                         }
@@ -298,7 +349,7 @@ private fun PuzzlePlay(
                             demoOn = false
                             if (gs.result!!.winner == Side.RED) {
                                 solved = true
-                                onSolved(puzzle.id, null)
+                                onSolved(puzzle.id, null, false)
                                 status = "演示结束：红方胜（" + gs.result!!.reason + "）。轮到你自己解一次。"
                             } else {
                                 status = "演示结束：红方没赢——这题比演示的路线更讲究，自己试试。"
@@ -355,7 +406,7 @@ private fun PuzzlePlay(
                 state = gs,
                 selected = selected,
                 legalTargets = targets,
-                hint = null,
+                hint = hintMove,
                 onTap = { onTap(it) }
             )
         }
@@ -386,6 +437,7 @@ private fun PuzzlePlay(
                             if (gs.turn == Side.BLACK) gs.undo()
                             userMoves = (userMoves - 1).coerceAtLeast(0)
                             selected = null
+                            hintMove = null
                             status = "已悔棋，重新想一步。"
                         }
                     }
@@ -400,11 +452,19 @@ private fun PuzzlePlay(
                         userMoves = 0
                         selected = null
                         solved = false
+                        hintsLeft = 3
+                        usedHint = false
+                        hintMove = null
                         status = "已重开。红先，请走第一步。"
                     }
                 },
                 enabled = !busy && !demoOn
             ) { Text("重开") }
+            OutlinedButton(
+                onClick = { askHint() },
+                enabled = !busy && !demoOn && !hintBusy && hintsLeft > 0 &&
+                    gs.result == null
+            ) { Text("提示一步（剩 $hintsLeft 次）") }
             Button(
                 onClick = { demoOn = !demoOn },
                 enabled = !busy || demoOn
