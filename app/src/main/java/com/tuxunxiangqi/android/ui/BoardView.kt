@@ -356,7 +356,7 @@ fun XiangqiBoard(
                 val pos = Pos(c, r)
                 val piece = state.pieceAt(pos) ?: continue
                 if (animating && mvNow != null && pos == mvNow.to) continue
-                drawPiece(measurer, point(pos), cell * 0.44f, piece, pos == selected, pieceBitmaps[piece.type to piece.side])
+                drawPiece(measurer, point(pos), cell * 0.44f, piece, pos == selected, baked = pieceBitmaps[piece.type to piece.side])
             }
         }
         if (animating && mvNow != null) {
@@ -784,7 +784,7 @@ private fun DrawScope.drawPiece(
         val sidePx = r / 0.385f
         drawImage(
             image = baked,
-            dstTopLeft = androidx.compose.ui.unit.IntOffset(
+            dstOffset = androidx.compose.ui.unit.IntOffset(
                 (center.x - 0.50f * sidePx).toInt(),
                 (center.y - 0.46f * sidePx).toInt()
             ),
