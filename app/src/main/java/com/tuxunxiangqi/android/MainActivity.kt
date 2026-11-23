@@ -40,6 +40,7 @@ private sealed interface Screen {
     data object Records : Screen
     data object Guess : Screen
     data object Puzzles : Screen
+    data object Openings : Screen
     data object Guide : Screen
     data class Review(val record: GameRecord) : Screen
     data object Editor : Screen
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
                             onSpectacle = { screen = Screen.Board(BoardMode.SPECTACLE) },
                             onGuess = { screen = Screen.Guess },
                             onPuzzles = { screen = Screen.Puzzles },
+                            onOpenings = { screen = Screen.Openings },
                             onGuide = { screen = Screen.Guide },
                             onSettings = { screen = Screen.Settings },
                             onResume = { game ->
@@ -115,6 +117,9 @@ class MainActivity : ComponentActivity() {
                             onBack = { screen = Screen.Home }
                         )
                         Screen.Puzzles -> PuzzleScreen(
+                            onBack = { screen = Screen.Home }
+                        )
+                        Screen.Openings -> com.tuxunxiangqi.android.ui.OpeningScreen(
                             onBack = { screen = Screen.Home }
                         )
                         Screen.Settings -> SettingsScreen(

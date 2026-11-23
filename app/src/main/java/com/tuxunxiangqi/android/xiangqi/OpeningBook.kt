@@ -166,4 +166,61 @@ object OpeningBook {
      *  from the standard start; empty when out of book. */
     fun lookup(historyUci: List<String>): List<Pair<String, String>> =
         book[historyUci.joinToString(" ")] ?: emptyList()
+
+    /** One browsable book node: the move history that reaches
+     *  the position, and the suggested replies there. */
+    data class BookNode(
+        val historyUci: List<String>,
+        val suggestions: List<Pair<String, String>>
+    )
+
+    /** Every node in the book, root (empty history) first, in
+     *  the order the lines were written. */
+    fun allNodes(): List<BookNode> = book.entries.map { (key, suggestions) ->
+        BookNode(
+            if (key.isBlank()) emptyList() else key.split(" "),
+            suggestions
+        )
+    }
+
+    /** The Chinese notation of a move history from the standard
+     *  start, one entry per move; stops early if a move cannot
+     *  be replayed (cannot happen for book histories). */
+    fun historyNotation(historyUci: List<String>): List<String> =
+        Notation.pvText(GameState().cells.toList(), historyUci, historyUci.size)
+
+    /** Book browsing search (1.15.0). A blank query returns the
+     *  whole book. Otherwise a node matches when the query text
+     *  appears in a suggestion's printed name (which carries the
+     *  定式 names, e.g. 中炮／顺炮／仙人指路）, in the notation of
+     *  its move history, or in the notation of one of its
+     *  suggested moves in the reached position. */
+    fun search(query: String): List<BookNode> {
+        val q = query.trim()
+        val nodes = allNodes()
+        if (q.isEmpty()) return nodes
+        return nodes.filter { node ->
+            if (node.suggestions.any { it.second.contains(q) }) {
+                return@filter true
+            }
+            if (historyNotation(node.historyUci).any { it.contains(q) }) {
+                return@filter true
+            }
+            val scratch = GameState()
+            var reachable = true
+            for (uci in node.historyUci) {
+                val mv = Fen.parseUciMove(uci)
+                if (mv == null || !scratch.tryMove(mv.first, mv.second)) {
+                    reachable = false
+                    break
+                }
+            }
+            reachable && node.suggestions.any { (uci, _) ->
+                val mv = Fen.parseUciMove(uci)
+                mv != null &&
+                    Notation.moveText(scratch.cells, mv.first, mv.second)
+                        .contains(q)
+            }
+        }
+    }
 }

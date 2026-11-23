@@ -34,6 +34,59 @@ class OpeningBookTest {
         }
     }
 
+    /** Browsing (1.15.0): allNodes covers exactly the known
+     *  histories, root first with an empty history. */
+    @Test
+    fun allNodesCoverTheWholeBook() {
+        val nodes = OpeningBook.allNodes()
+        assertEquals(OpeningBook.knownHistories().size, nodes.size)
+        assertTrue(nodes.first().historyUci.isEmpty())
+        assertEquals(
+            OpeningBook.knownHistories(),
+            nodes.map { it.historyUci.joinToString(" ") }.toSet()
+        )
+        for (node in nodes) {
+            assertEquals(
+                OpeningBook.lookup(node.historyUci), node.suggestions
+            )
+        }
+    }
+
+    /** Search matches 定式 names carried in suggestion names. */
+    @Test
+    fun searchFindsOpeningNames() {
+        val zhongPao = OpeningBook.search("中炮")
+        assertTrue(zhongPao.isNotEmpty())
+        assertTrue(zhongPao.any { it.historyUci.isEmpty() })
+        val shunPao = OpeningBook.search("顺炮")
+        assertTrue(shunPao.isNotEmpty())
+        assertTrue(
+            shunPao.all { node ->
+                node.suggestions.any { it.second.contains("顺炮") }
+            }
+        )
+    }
+
+    /** Search also matches move notation, both in a node's
+     *  history and in its suggested moves. */
+    @Test
+    fun searchFindsNotationText() {
+        assertTrue(OpeningBook.search("马二进三").isNotEmpty())
+        assertTrue(OpeningBook.search("炮二平五").isNotEmpty())
+    }
+
+    /** Blank query is the whole book; nonsense finds nothing. */
+    @Test
+    fun searchBlankAndNonsense() {
+        assertEquals(
+            OpeningBook.allNodes().size, OpeningBook.search("").size
+        )
+        assertEquals(
+            OpeningBook.allNodes().size, OpeningBook.search("  ").size
+        )
+        assertTrue(OpeningBook.search("不存在的定式xyz").isEmpty())
+    }
+
     /** The printed name of every suggestion must be the notation
      *  the app itself generates for that move. Legality alone did
      *  not catch the mirrored entries fixed in 1.3.0 （仙人指路

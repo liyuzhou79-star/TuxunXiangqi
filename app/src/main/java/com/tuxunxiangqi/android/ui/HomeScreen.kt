@@ -58,6 +58,7 @@ fun HomeScreen(
     onSpectacle: () -> Unit = {},
     onGuess: () -> Unit = {},
     onPuzzles: () -> Unit = {},
+    onOpenings: () -> Unit = {},
     onGuide: () -> Unit = {},
     onSettings: () -> Unit = {},
     onResume: (com.tuxunxiangqi.android.data.ResumeGame) -> Unit = {}
@@ -223,6 +224,16 @@ fun HomeScreen(
             contentColor = MaterialTheme.colorScheme.onSurface,
             iconTint = MaterialTheme.colorScheme.primary,
             onClick = onPuzzles
+        )
+        Spacer(Modifier.height(14.dp))
+        EntryCard(
+            title = "开局库",
+            subtitle = "内置定式可以搜、可以看，点开就在棋盘上摆出局面和建议着法",
+            icon = Icons.Filled.List,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = onOpenings
         )
         Spacer(Modifier.height(14.dp))
         EntryCard(

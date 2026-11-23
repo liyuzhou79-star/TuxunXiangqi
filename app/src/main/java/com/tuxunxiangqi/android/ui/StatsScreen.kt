@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -149,6 +150,15 @@ fun StatsScreen(onBack: () -> Unit) {
                         text = "$cat 类：已解 $done / " + inCat.size + " 题",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // Completion bar per category (1.15.0): the
+                    // same numbers as the text line, readable at
+                    // a glance.
+                    LinearProgressIndicator(
+                        progress = { done.toFloat() / inCat.size },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 2.dp, bottom = 4.dp)
                     )
                 }
             }
