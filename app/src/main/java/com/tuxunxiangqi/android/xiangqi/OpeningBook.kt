@@ -157,6 +157,36 @@ object OpeningBook {
             "b0c2" to "马八进七",
             "c3c4" to "兵七进一",
             "i0h0" to "车一平二",
+        ),
+        "h2e2 b9c7 h0g2 c6c5" to listOf(
+            "b0c2" to "马八进七",
+            "i0h0" to "车一平二",
+            "g3g4" to "兵三进一",
+        ),
+        "h2e2 b9c7 h0g2 a9a8" to listOf(
+            "b0c2" to "马八进七",
+            "i0h0" to "车一平二",
+            "g3g4" to "兵三进一",
+        ),
+        "h2e2 h9g7 h0g2 a9a8 b0c2 b9c7" to listOf(
+            "i0h0" to "车一平二",
+            "b2b4" to "炮八进二",
+            "g3g4" to "兵三进一",
+        ),
+        "h2e2 h7e7 h0g2 h9g7 b0c2" to listOf(
+            "b9c7" to "马2进3",
+            "i9i8" to "车9进1",
+            "g9e7" to "象7进5",
+        ),
+        "c3c4 c6c5 c4c5 h9g7 h2e2" to listOf(
+            "h7e7" to "炮8平5",
+            "b9c7" to "马2进3",
+            "g6g5" to "卒7进1",
+        ),
+        "g0e2 c9e7 b2b4 b9c7" to listOf(
+            "h0g2" to "马二进三",
+            "h2e2" to "炮二平五",
+            "i0h0" to "车一平二",
         )
     )
 

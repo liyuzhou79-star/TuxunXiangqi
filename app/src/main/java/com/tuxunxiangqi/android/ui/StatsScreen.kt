@@ -46,6 +46,17 @@ fun StatsScreen(onBack: () -> Unit) {
     }
     val guessStats = remember { GuessStatsStore(context) }
     val guessTotal = remember { guessStats.total() }
+    // Daily-puzzle days (1.29.0): total days solved and the
+    // current streak, from the same "daily_days" set the home
+    // card reads.
+    val dailyDaysInfo = remember {
+        val p = context.getSharedPreferences("puzzles", Context.MODE_PRIVATE)
+        val days = p.getStringSet("daily_days", emptySet()).orEmpty()
+            .mapNotNull { it.toLongOrNull() }.toSet()
+        days.size to com.tuxunxiangqi.android.data.dailyStreak(
+            days, java.time.LocalDate.now().toEpochDay()
+        )
+    }
 
     val aiGames = records.filter { it.modeLabel.startsWith("人机对弈") }
     fun outcome(r: com.tuxunxiangqi.android.data.GameRecord): String {
@@ -158,6 +169,17 @@ fun StatsScreen(onBack: () -> Unit) {
                     if (assistedCount > 0) "（其中 $assistedCount 题用过提示）" else "",
                 style = MaterialTheme.typography.bodyMedium
             )
+            if (dailyDaysInfo.first > 0) {
+                Text(
+                    text = "每日一题累计完成 " + dailyDaysInfo.first + " 天" +
+                        if (dailyDaysInfo.second >= 2) {
+                            "，当前连续 " + dailyDaysInfo.second + " 天"
+                        } else {
+                            ""
+                        },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
             for (cat in Puzzles.categoryOrder) {
                 val inCat = Puzzles.all.filter { Puzzles.categoryOf(it.id) == cat }
                 if (inCat.isNotEmpty()) {
