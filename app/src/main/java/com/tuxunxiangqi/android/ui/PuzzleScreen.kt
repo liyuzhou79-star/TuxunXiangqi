@@ -23,6 +23,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedButton
@@ -338,6 +339,17 @@ fun PuzzleScreen(onBack: () -> Unit) {
                     if (groupSolved > 0) "（已解 $groupSolved）" else "",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
+            )
+            // Category progress bar (1.37.0): the header count
+            // as a bar, same numbers — how far through this
+            // group the player is reads at a glance.
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = {
+                    if (group.isEmpty()) 0f
+                    else groupSolved.toFloat() / group.size
+                },
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
             for (p in group) {

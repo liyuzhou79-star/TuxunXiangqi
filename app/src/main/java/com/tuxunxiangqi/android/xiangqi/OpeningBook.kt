@@ -326,6 +326,12 @@ object OpeningBook {
             if (node.suggestions.any { it.second.contains(q) }) {
                 return@filter true
             }
+            // The accumulated line name (1.37.0): a deep node in
+            // the 顺炮 line is findable by 顺炮 even when its own
+            // suggestions carry no label.
+            if (lineName(node.historyUci)?.contains(q) == true) {
+                return@filter true
+            }
             if (historyNotation(node.historyUci).any { it.contains(q) }) {
                 return@filter true
             }

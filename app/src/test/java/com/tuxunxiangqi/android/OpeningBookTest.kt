@@ -62,8 +62,22 @@ class OpeningBookTest {
         val shunPao = OpeningBook.search("顺炮")
         assertTrue(shunPao.isNotEmpty())
         assertTrue(
-            shunPao.all { node ->
+            shunPao.any { node ->
                 node.suggestions.any { it.second.contains("顺炮") }
+            }
+        )
+    }
+
+    /** Search also matches the accumulated line name (1.37.0):
+     *  a deep node of the 顺炮 line is findable by 顺炮 even
+     *  though none of its own suggestions carries the label. */
+    @Test
+    fun searchFindsLineNames() {
+        val byLine = OpeningBook.search("顺炮")
+        assertTrue(
+            byLine.any { node ->
+                OpeningBook.lineName(node.historyUci) == "顺炮" &&
+                    node.suggestions.none { it.second.contains("顺炮") }
             }
         )
     }
