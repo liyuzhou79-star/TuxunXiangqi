@@ -7,7 +7,9 @@ import java.io.File
 
 /** One saved game record. Moves are UCI strings from the initial
  *  position; [evals] holds Red-perspective centipawns keyed by the
- *  move count at which they were measured (sparse). */
+ *  move count at which they were measured (sparse); [marks]
+ *  holds whole-game-analysis verdicts keyed by 1-based move
+ *  number ("?" questionable, "??" blunder). */
 data class GameRecord(
     val id: Long,
     val title: String,
@@ -16,7 +18,8 @@ data class GameRecord(
     val resultText: String,
     val initialFen: String,
     val movesUci: List<String>,
-    val evals: Map<Int, Int>
+    val evals: Map<Int, Int>,
+    val marks: Map<Int, String> = emptyMap()
 )
 
 /** Plain JSON file storage for game records (no database needed at
@@ -43,6 +46,13 @@ class RecordStore(context: Context) {
                 val moves = ArrayList<String>()
                 val movesArr = o.optJSONArray("moves") ?: JSONArray()
                 for (j in 0 until movesArr.length()) moves.add(movesArr.getString(j))
+                val marksObj = o.optJSONObject("marks") ?: JSONObject()
+                val marks = HashMap<Int, String>()
+                val mKeys = marksObj.keys()
+                while (mKeys.hasNext()) {
+                    val k = mKeys.next()
+                    marks[k.toInt()] = marksObj.getString(k)
+                }
                 out.add(
                     GameRecord(
                         id = o.getLong("id"),
@@ -52,7 +62,8 @@ class RecordStore(context: Context) {
                         resultText = o.optString("result", ""),
                         initialFen = o.optString("fen", ""),
                         movesUci = moves,
-                        evals = evals
+                        evals = evals,
+                        marks = marks
                     )
                 )
             }
@@ -97,6 +108,9 @@ class RecordStore(context: Context) {
             val evals = JSONObject()
             for ((k, v) in r.evals) evals.put(k.toString(), v)
             o.put("evals", evals)
+            val marks = JSONObject()
+            for ((k, v) in r.marks) marks.put(k.toString(), v)
+            o.put("marks", marks)
             arr.put(o)
         }
         file.writeText(arr.toString())
@@ -119,6 +133,12 @@ fun GameRecord.toPortableText(): String {
             .joinToString(" ") { "${it.key}:${it.value}" })
         sb.append('\n')
     }
+    if (marks.isNotEmpty()) {
+        sb.append("[标记] ")
+        sb.append(marks.entries.sortedBy { it.key }
+            .joinToString(" ") { "${it.key}:${it.value}" })
+        sb.append('\n')
+    }
     return sb.toString()
 }
 
@@ -130,6 +150,7 @@ fun parsePortableRecord(text: String, fallbackId: Long): GameRecord? {
     var fen = ""
     var moves: List<String> = emptyList()
     val evals = HashMap<Int, Int>()
+    val marks = HashMap<Int, String>()
     for (raw in text.lines()) {
         val line = raw.trim()
         fun value(tag: String): String? =
@@ -151,6 +172,15 @@ fun parsePortableRecord(text: String, fallbackId: Long): GameRecord? {
                 }
             }
         }
+        value("标记")?.let {
+            for (part in it.split(Regex("\\s+"))) {
+                val kv = part.split(":")
+                if (kv.size == 2) {
+                    val k = kv[0].toIntOrNull()
+                    if (k != null && kv[1].isNotBlank()) marks[k] = kv[1]
+                }
+            }
+        }
     }
     if (fen.isBlank()) return null
     return GameRecord(
@@ -161,6 +191,7 @@ fun parsePortableRecord(text: String, fallbackId: Long): GameRecord? {
         resultText = result,
         initialFen = fen,
         movesUci = moves,
-        evals = evals
+        evals = evals,
+        marks = marks
     )
 }

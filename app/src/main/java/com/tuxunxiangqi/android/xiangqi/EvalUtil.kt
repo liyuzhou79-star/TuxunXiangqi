@@ -23,6 +23,51 @@ object EvalUtil {
         return (cp?.times(sign)) to (mateIn?.times(sign))
     }
 
+    /** Score loss threshold (centipawns, mover's perspective)
+     *  for calling a move questionable. */
+    const val QUESTIONABLE_CP = 120
+
+    /** Score loss threshold for calling a move a blunder. */
+    const val BLUNDER_CP = 250
+
+    /**
+     * How much score move [moveNo] (1-based) gave away, from the
+     * mover's point of view, in centipawns; positive means the
+     * move lost ground. [evals] are Red-perspective scores keyed
+     * by move count (position index: evals[k] is the position
+     * after k moves) and [initialTurn] is who moves at position
+     * 0. Null when either side of the move was never measured.
+     */
+    fun moveLossCp(evals: Map<Int, Int>, initialTurn: Side, moveNo: Int): Int? {
+        val before = evals[moveNo - 1] ?: return null
+        val after = evals[moveNo] ?: return null
+        val moverIsRed = ((moveNo - 1) % 2 == 0) == (initialTurn == Side.RED)
+        val sign = if (moverIsRed) 1 else -1
+        return (before - after) * sign
+    }
+
+    /**
+     * Marks the moves that gave away a lot of score: "?" for a
+     * questionable move, "??" for an outright blunder, keyed by
+     * 1-based move number. Moves without both neighbouring
+     * measurements are left unmarked.
+     */
+    fun classifyMoves(
+        evals: Map<Int, Int>,
+        initialTurn: Side,
+        moveCount: Int
+    ): Map<Int, String> {
+        val out = HashMap<Int, String>()
+        for (k in 1..moveCount) {
+            val loss = moveLossCp(evals, initialTurn, k) ?: continue
+            when {
+                loss >= BLUNDER_CP -> out[k] = "??"
+                loss >= QUESTIONABLE_CP -> out[k] = "?"
+            }
+        }
+        return out
+    }
+
     /** Plain-language summary of a Red-perspective score. */
     fun describeRed(cp: Int?, mateIn: Int?): String {
         if (mateIn != null) {

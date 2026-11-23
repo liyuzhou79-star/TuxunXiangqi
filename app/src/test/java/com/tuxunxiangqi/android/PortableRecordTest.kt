@@ -22,7 +22,8 @@ class PortableRecordTest {
             resultText = "红胜",
             initialFen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
             movesUci = listOf("h2e2", "h9g7", "h0g2"),
-            evals = mapOf(0 to 15, 2 to -30)
+            evals = mapOf(0 to 15, 2 to -30),
+            marks = mapOf(1 to "?", 3 to "??")
         )
         val back = parsePortableRecord(rec.toPortableText(), 99L)
         assertNotNull(back)
@@ -32,6 +33,7 @@ class PortableRecordTest {
         assertEquals(rec.initialFen, back.initialFen)
         assertEquals(rec.movesUci, back.movesUci)
         assertEquals(rec.evals, back.evals)
+        assertEquals(rec.marks, back.marks)
         assertEquals(99L, back.id)
     }
 

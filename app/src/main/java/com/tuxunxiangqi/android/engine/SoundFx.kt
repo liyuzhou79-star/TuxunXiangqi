@@ -13,7 +13,7 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.random.Random
 
-enum class SoundKind { MOVE, CAPTURE, CHECK, WIN, LOSE, DRAW, GOOD, BAD, MATE_VOICE }
+enum class SoundKind { MOVE, CAPTURE, CHECK, WIN, LOSE, DRAW, GOOD, BAD, MATE_VOICE, TICK }
 
 /** In-game sounds. Move, capture, win, lose and draw use real
  *  recorded clips bundled in res/raw (from the open-source
@@ -184,6 +184,9 @@ object SoundFx {
                 Seg(880.0, 160, vol = 0.5)
             )
             SoundKind.BAD -> listOf(Seg(220.0, 180, vol = 0.5))
+            // Clock running out: one short, quiet click per
+            // second for the last ten seconds.
+            SoundKind.TICK -> listOf(Seg(1560.0, 30, vol = 0.28))
         }
         val totalMs = segs.sumOf { it.ms }
         val out = ShortArray(totalMs * RATE / 1000)

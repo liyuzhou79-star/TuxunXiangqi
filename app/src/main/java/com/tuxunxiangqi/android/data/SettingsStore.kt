@@ -113,6 +113,9 @@ fun buildBackupJson(context: Context): String {
         val evals = JSONObject()
         for ((k, v) in r.evals) evals.put(k.toString(), v)
         o.put("evals", evals)
+        val marks = JSONObject()
+        for ((k, v) in r.marks) marks.put(k.toString(), v)
+        o.put("marks", marks)
         recArr.put(o)
     }
     root.put("records", recArr)
@@ -154,6 +157,13 @@ fun applyBackupJson(context: Context, text: String): String? {
         val moves = ArrayList<String>()
         val movesArr = o.optJSONArray("moves") ?: org.json.JSONArray()
         for (j in 0 until movesArr.length()) moves.add(movesArr.getString(j))
+        val marks = HashMap<Int, String>()
+        val marksObj = o.optJSONObject("marks") ?: JSONObject()
+        val mKeys = marksObj.keys()
+        while (mKeys.hasNext()) {
+            val k = mKeys.next()
+            marks[k.toInt()] = marksObj.getString(k)
+        }
         records.add(
             GameRecord(
                 id = o.optLong("id", System.currentTimeMillis() + i),
@@ -163,7 +173,8 @@ fun applyBackupJson(context: Context, text: String): String? {
                 resultText = o.optString("result", ""),
                 initialFen = o.optString("fen", ""),
                 movesUci = moves,
-                evals = evals
+                evals = evals,
+                marks = marks
             )
         )
     }

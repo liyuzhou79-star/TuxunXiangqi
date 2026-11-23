@@ -312,6 +312,10 @@ fun BoardScreen(
     var redMs by remember { mutableStateOf(0L) }
     var blackMs by remember { mutableStateOf(0L) }
     var clockPaused by remember { mutableStateOf(false) }
+    // Last (side, whole-second) bucket the low-time tick sounded
+    // for, so the final-ten-seconds reminder clicks exactly once
+    // per second instead of on every clock loop pass.
+    var tickKey by remember { mutableStateOf("") }
     // View.
     var flipped by remember { mutableStateOf(false) }
     var showCoords by remember { mutableStateOf(false) }
@@ -645,6 +649,16 @@ fun BoardScreen(
                     blackMs = 0
                     state.forceResult(Side.RED, "黑方超时")
                     break
+                }
+            }
+            // Final ten seconds for the side to move: one tick
+            // per whole second left.
+            val remain = if (state.turn == Side.RED) redMs else blackMs
+            if (remain in 1..10_000L) {
+                val key = state.turn.name + "#" + (remain + 999) / 1000
+                if (tickKey != key) {
+                    tickKey = key
+                    SoundFx.play(context, SoundKind.TICK)
                 }
             }
         }

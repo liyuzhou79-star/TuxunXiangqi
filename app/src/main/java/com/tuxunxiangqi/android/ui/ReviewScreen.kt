@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -32,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.GameRecord
+import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.xiangqi.EvalUtil
 import com.tuxunxiangqi.android.xiangqi.Fen
@@ -53,8 +55,14 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     DisposableEffect(engine) { onDispose { engine.close() } }
     LaunchedEffect(Unit) { engine.start({}, {}) }
     val scope = rememberCoroutineScope()
+    val recordStore = remember { RecordStore(context) }
 
-    val total = record.movesUci.size
+    // The record as currently stored; whole-game analysis writes
+    // its results back into this copy so the page (chart, marks,
+    // move list) refreshes without leaving and re-entering.
+    var liveRecord by remember(record.id) { mutableStateOf(record) }
+
+    val total = liveRecord.movesUci.size
 
     // Rebuild every position and the Chinese notation of each move.
     val replay = remember(record.id) {
@@ -85,6 +93,70 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     var compareText by remember { mutableStateOf<String?>(null) }
     var compareBusy by remember { mutableStateOf(false) }
 
+    // Whole-game batch analysis: the engine scores every position
+    // in turn (about 0.3 s each, strictly one at a time on the
+    // resident engine so the phone only warms up gently), then
+    // score-drops are classified into ? / ?? marks and both are
+    // written back into the stored record.
+    var batchRunning by remember { mutableStateOf(false) }
+    var batchDone by remember { mutableStateOf(0) }
+    var batchNote by remember { mutableStateOf<String?>(null) }
+    val batchCancel = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+
+    fun startBatchAnalysis() {
+        if (batchRunning || maxIdx == 0) return
+        batchCancel.set(false)
+        batchRunning = true
+        batchDone = 0
+        batchNote = null
+        val results = HashMap<Int, Int>()
+        val startTurn = snapshots[0].second
+
+        fun finish(headline: String) {
+            batchRunning = false
+            val merged = liveRecord.evals.toMutableMap()
+            merged.putAll(results)
+            val marks = EvalUtil.classifyMoves(merged, startTurn, total)
+            val updated = liveRecord.copy(evals = merged, marks = marks)
+            recordStore.save(updated)
+            liveRecord = updated
+            val q = marks.values.count { it == "?" }
+            val b = marks.values.count { it == "??" }
+            batchNote = headline +
+                "已保存 ${results.size} 个局面的评分，标出疑问手 $q 手、失误手 $b 手。"
+        }
+
+        fun step(i: Int) {
+            if (batchCancel.get()) {
+                finish("已取消分析。")
+                return
+            }
+            if (i > maxIdx) {
+                finish("整局分析完成。")
+                return
+            }
+            val snap = snapshots[i]
+            val gs = GameState()
+            gs.newGame(snap.first, snap.second)
+            engine.analyze(Fen.toFen(gs), 300, multiPv = 1) { res, err ->
+                if (err != null) {
+                    finish("引擎分析中断（$err）。")
+                    return@analyze
+                }
+                val best = res?.candidates?.firstOrNull()
+                if (best != null) {
+                    val (rcp, rmate) = EvalUtil.toRedPerspective(
+                        best.scoreCp, best.mateIn, snap.second
+                    )
+                    results[i] = rcp ?: rmate?.let { if (it > 0) 1500 else -1500 } ?: 0
+                }
+                batchDone = i + 1
+                step(i + 1)
+            }
+        }
+        step(0)
+    }
+
     LaunchedEffect(playing) {
         while (playing) {
             delay(1100)
@@ -104,15 +176,15 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     }
 
     // Recorded evals as (moveCount, redCp) points for the chart.
-    val trendPoints = remember(record.id) {
-        record.evals.entries.sortedBy { it.key }.map { it.key to it.value }
+    val trendPoints = remember(liveRecord.evals) {
+        liveRecord.evals.entries.sortedBy { it.key }.map { it.key to it.value }
     }
     val swings = remember(trendPoints) { keySwings(trendPoints) }
     val swingMoves = remember(swings) { swings.map { it.first } }
 
     fun compareWithEngine() {
         if (compareBusy) return
-        val actualUci = record.movesUci.getOrNull(idx) ?: run {
+        val actualUci = liveRecord.movesUci.getOrNull(idx) ?: run {
             compareText = "已经是最后一手了，没有下一步可对比。"
             return
         }
@@ -156,13 +228,13 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
         Text(
-            text = record.title,
+            text = liveRecord.title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            text = record.modeLabel + " · " + record.resultText,
+            text = liveRecord.modeLabel + " · " + liveRecord.resultText,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -198,12 +270,31 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                val evalHere = record.evals[idx]
+                val evalHere = liveRecord.evals[idx]
                 if (evalHere != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "这一步的形势：" + EvalUtil.describeRed(evalHere, null),
                         style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                // Whole-game analysis verdict for the move that
+                // produced this position.
+                val markHere = if (idx >= 1) liveRecord.marks[idx] else null
+                if (markHere != null) {
+                    val loss = EvalUtil.moveLossCp(
+                        liveRecord.evals, snapshots[0].second, idx
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "上一手被标为" +
+                            (if (markHere == "??") "失误手（??）" else "疑问手（?）") +
+                            (loss?.let {
+                                "：形势掉了约合 " +
+                                    String.format("%.1f", it / 100.0) + " 个兵"
+                            } ?: ""),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
                 Spacer(Modifier.height(10.dp))
@@ -247,6 +338,50 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = compareText!!,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { startBatchAnalysis() },
+                        enabled = !batchRunning && maxIdx > 0
+                    ) { Text("整局分析") }
+                    if (batchRunning) {
+                        OutlinedButton(onClick = { batchCancel.set(true) }) {
+                            Text("取消分析")
+                        }
+                    }
+                    if (liveRecord.marks.isNotEmpty()) {
+                        OutlinedButton(onClick = {
+                            val marked = liveRecord.marks.keys.sorted()
+                            val next = marked.firstOrNull { it > idx }
+                                ?: marked.first()
+                            idx = next.coerceAtMost(maxIdx)
+                        }) { Text("下一标记手") }
+                    }
+                }
+                if (batchRunning) {
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        progress = {
+                            if (maxIdx > 0) batchDone.toFloat() / (maxIdx + 1)
+                            else 0f
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "正在分析第 $batchDone / ${maxIdx + 1} 个局面。" +
+                            "每步约 0.3 秒，整局越长越久，手机会微微发热，可随时取消，进度不会白费。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (batchNote != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = batchNote!!,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -308,11 +443,12 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 val text = buildString {
                     notations.forEachIndexed { i, n ->
+                        val marked = n + (liveRecord.marks[i + 1] ?: "")
                         if (i % 2 == 0) {
                             if (i > 0) append('\n')
-                            append(i / 2 + 1).append(". ").append(n)
+                            append(i / 2 + 1).append(". ").append(marked)
                         } else {
-                            append("  ").append(n)
+                            append("  ").append(marked)
                         }
                     }
                 }
