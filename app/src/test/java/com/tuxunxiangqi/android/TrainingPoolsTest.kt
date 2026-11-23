@@ -63,7 +63,9 @@ class TrainingPoolsTest {
         // side to move matching the ply parity of a 4–6 ply
         // book line (even plies = Red to move).
         val pool = GuessPositions.opening
-        assertEquals(12, pool.size)
+        // Derived from the book's 4–6 ply nodes: 12 when the
+        // book had 36 nodes, 17 since it grew to 42 (1.31.0).
+        assertEquals(17, pool.size)
         assertEquals(pool.size, pool.map { it.second }.toSet().size)
         for ((label, fen) in pool) {
             val parsed = com.tuxunxiangqi.android.xiangqi.Fen.fromFen(fen)
