@@ -34,7 +34,8 @@ private sealed interface Screen {
     data object Home : Screen
     data class Board(
         val mode: BoardMode,
-        val startCells: List<com.tuxunxiangqi.android.xiangqi.Piece?>? = null
+        val startCells: List<com.tuxunxiangqi.android.xiangqi.Piece?>? = null,
+        val resume: com.tuxunxiangqi.android.data.ResumeGame? = null
     ) : Screen
     data object Records : Screen
     data object Guess : Screen
@@ -82,12 +83,23 @@ class MainActivity : ComponentActivity() {
                             onGuess = { screen = Screen.Guess },
                             onPuzzles = { screen = Screen.Puzzles },
                             onGuide = { screen = Screen.Guide },
-                            onSettings = { screen = Screen.Settings }
+                            onSettings = { screen = Screen.Settings },
+                            onResume = { game ->
+                                screen = Screen.Board(
+                                    mode = if (game.modeName == "AI") {
+                                        BoardMode.AI
+                                    } else {
+                                        BoardMode.PVP
+                                    },
+                                    resume = game
+                                )
+                            }
                         )
                         is Screen.Board -> BoardScreen(
                             mode = s.mode,
                             onBack = { screen = Screen.Home },
                             startCells = s.startCells,
+                            resume = s.resume,
                             onReviewRecord = { id ->
                                 val rec = com.tuxunxiangqi.android.data.RecordStore(
                                     applicationContext

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -34,6 +35,10 @@ import androidx.compose.material3.Text
 import com.tuxunxiangqi.android.data.Puzzles
 import java.util.Calendar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,8 +59,14 @@ fun HomeScreen(
     onGuess: () -> Unit = {},
     onPuzzles: () -> Unit = {},
     onGuide: () -> Unit = {},
-    onSettings: () -> Unit = {}
+    onSettings: () -> Unit = {},
+    onResume: (com.tuxunxiangqi.android.data.ResumeGame) -> Unit = {}
 ) {
+    val homeContext = androidx.compose.ui.platform.LocalContext.current
+    val resumeStore = remember { com.tuxunxiangqi.android.data.ResumeStore(homeContext) }
+    var savedGame by remember {
+        mutableStateOf(resumeStore.load()?.takeIf { it.movesUci.isNotEmpty() })
+    }
     // One scrollable container for the whole page (scroll audit:
     // every page must stay reachable on short screens).
     Column(
@@ -90,6 +101,41 @@ fun HomeScreen(
         )
 
         Spacer(Modifier.height(28.dp))
+        // Continue-an-unfinished-game card, only when a snapshot
+        // exists (games snapshot themselves after every move).
+        savedGame?.let { game ->
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "继续对局",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = game.summary() + "，上次下到一半的棋还留着。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row {
+                        Button(onClick = { onResume(game) }) { Text("接着下") }
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedButton(onClick = {
+                            resumeStore.clear()
+                            savedGame = null
+                        }) { Text("放弃这局") }
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+        }
         // Primary entry: filled vermilion card so the main action
         // reads as the main action.
         EntryCard(

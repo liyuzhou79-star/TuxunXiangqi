@@ -53,6 +53,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tuxunxiangqi.android.data.GameRecord
+import com.tuxunxiangqi.android.data.ResumeGame
+import com.tuxunxiangqi.android.data.ResumeStore
 import com.tuxunxiangqi.android.data.SettingsStore
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.engine.Candidate
@@ -265,12 +267,24 @@ fun BoardScreen(
     mode: BoardMode,
     onBack: () -> Unit,
     startCells: List<Piece?>? = null,
-    onReviewRecord: (Long) -> Unit = {}
+    onReviewRecord: (Long) -> Unit = {},
+    resume: ResumeGame? = null
 ) {
     val context = LocalContext.current
     val state = remember {
         GameState().apply {
-            if (startCells != null) newGame(startCells, Side.RED)
+            if (resume != null) {
+                // Rebuild the saved game: initial position, then
+                // replay every move that was played.
+                val parsed = Fen.fromFen(resume.initialFen)
+                if (parsed != null) newGame(parsed.first, parsed.second)
+                for (uci in resume.movesUci) {
+                    val mv = Fen.parseUciMove(uci) ?: break
+                    if (!tryMove(mv.first, mv.second)) break
+                }
+            } else if (startCells != null) {
+                newGame(startCells, Side.RED)
+            }
         }
     }
     val engine = remember { PikafishEngine(context) }
@@ -278,6 +292,7 @@ fun BoardScreen(
         onDispose { engine.close() }
     }
     val recordStore = remember { RecordStore(context) }
+    val resumeStore = remember { ResumeStore(context) }
     var savedRecordId by remember { mutableStateOf<Long?>(null) }
     var finalSaved by remember { mutableStateOf(false) }
     val rootView = LocalView.current
@@ -285,21 +300,35 @@ fun BoardScreen(
     var boardSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
 
     var selected by remember { mutableStateOf<Pos?>(null) }
-    // Setup.
-    var setupDone by remember { mutableStateOf(mode == BoardMode.PVP) }
-    var humanSide by remember { mutableStateOf(Side.RED) }
+    // Setup. A resumed game skips setup entirely and restores
+    // the exact configuration it was saved under.
+    var setupDone by remember {
+        mutableStateOf(mode == BoardMode.PVP || resume != null)
+    }
+    var humanSide by remember {
+        mutableStateOf(
+            if (resume != null && !resume.humanSideRed) Side.BLACK else Side.RED
+        )
+    }
     val settingsStore = remember { SettingsStore(context) }
     var level by remember {
         mutableStateOf(
-            when (settingsStore.defaultLevelLabel) {
+            when (resume?.levelLabel ?: settingsStore.defaultLevelLabel) {
                 "休闲" -> Level.CASUAL
                 "高手" -> Level.EXPERT
                 else -> Level.NORMAL
             }
         )
     }
-    var strength by remember { mutableStateOf(settingsStore.strengthLevel) }
-    var handicap by remember { mutableStateOf(Handicap.NONE) }
+    var strength by remember {
+        mutableStateOf(resume?.strength ?: settingsStore.strengthLevel)
+    }
+    var handicap by remember {
+        mutableStateOf(
+            Handicap.values().firstOrNull { it.label == resume?.handicapLabel }
+                ?: Handicap.NONE
+        )
+    }
     var specSpeed by remember {
         mutableStateOf(
             SpecSpeed.values().firstOrNull { it.label == settingsStore.specSpeedLabel }
@@ -307,10 +336,19 @@ fun BoardScreen(
         )
     }
     var spectaclePaused by remember { mutableStateOf(false) }
-    // Clock.
-    var clockMinutes by remember { mutableStateOf(settingsStore.defaultClockMinutes) }
-    var redMs by remember { mutableStateOf(0L) }
-    var blackMs by remember { mutableStateOf(0L) }
+    // Clock. The remaining times start at the full clock value:
+    // initialising them to zero made a player-vs-player game
+    // with a default clock time out on the very first tick
+    // (fixed in 1.9.0). A resumed game restores its saved times.
+    var clockMinutes by remember {
+        mutableStateOf(resume?.clockMinutes ?: settingsStore.defaultClockMinutes)
+    }
+    var redMs by remember {
+        mutableStateOf(resume?.redMs ?: (clockMinutes * 60_000L))
+    }
+    var blackMs by remember {
+        mutableStateOf(resume?.blackMs ?: (clockMinutes * 60_000L))
+    }
     var clockPaused by remember { mutableStateOf(false) }
     // Last (side, whole-second) bucket the low-time tick sounded
     // for, so the final-ten-seconds reminder clicks exactly once
@@ -335,8 +373,13 @@ fun BoardScreen(
     val previewState = remember { GameState() }
     var autoAnalyze by remember { mutableStateOf(false) }
     var analysisMs by remember { mutableStateOf(settingsStore.defaultAnalysisMs.toFloat()) }
-    var evalPoints by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
-    var lastRedCp by remember { mutableStateOf<Int?>(null) }
+    var evalPoints by remember {
+        mutableStateOf(
+            resume?.evals?.entries?.sortedBy { it.key }
+                ?.map { it.key to it.value } ?: emptyList()
+        )
+    }
+    var lastRedCp by remember { mutableStateOf(evalPoints.lastOrNull()?.second) }
     var showTrendDialog by remember { mutableStateOf(false) }
     // Dialogs / messages.
     var showResignDialog by remember { mutableStateOf(false) }
@@ -464,6 +507,41 @@ fun BoardScreen(
             finalSaved = true
             saveRecord(final = true)
         }
+    }
+
+    // In-progress snapshot behind the home screen's 「继续对局」
+    // card: refreshed after every move and once more when the
+    // page is left, cleared when the game ends or restarts.
+    // Spectacle games are shows, not resumable games.
+    fun currentResume(): ResumeGame = ResumeGame(
+        modeName = mode.name,
+        levelLabel = level.label,
+        humanSideRed = humanSide == Side.RED,
+        handicapLabel = handicap.label,
+        strength = strength,
+        clockMinutes = clockMinutes,
+        redMs = redMs,
+        blackMs = blackMs,
+        initialFen = Fen.toFen(state.initialCells, state.initialTurn),
+        movesUci = state.historyMoves().map { Fen.toUci(it.from, it.to) },
+        evals = evalPoints.toMap(),
+        savedAtMs = System.currentTimeMillis()
+    )
+
+    fun snapshotResume() {
+        if (mode == BoardMode.SPECTACLE) return
+        if (!setupDone || state.result != null || state.moveCount == 0) return
+        resumeStore.save(currentResume())
+    }
+
+    LaunchedEffect(state.moveCount) {
+        snapshotResume()
+    }
+    DisposableEffect(Unit) {
+        onDispose { snapshotResume() }
+    }
+    LaunchedEffect(state.result) {
+        if (state.result != null) resumeStore.clear()
     }
 
     // Sound effects: only when the move count actually grows, so
@@ -671,6 +749,7 @@ fun BoardScreen(
 
     fun restart() {
         if (busy) return
+        resumeStore.clear()
         savedRecordId = null
         finalSaved = false
         state.newGame(state.initialCells, state.initialTurn)
