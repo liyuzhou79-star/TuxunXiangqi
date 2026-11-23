@@ -64,7 +64,8 @@ class RecordSourceTest {
     fun deeperBookNodeIsBookStart() {
         val r = rec(replayFen(listOf("h2e2", "h9g7", "h0g2")))
         assertEquals("定式开局", r.sourceLabel())
-        assertTrue(r.sourceNote().contains("马二进三"))
+        // Generated notation uses the red horse glyph 傌.
+        assertTrue(r.sourceNote().contains("傌二进三"))
     }
 
     @Test
