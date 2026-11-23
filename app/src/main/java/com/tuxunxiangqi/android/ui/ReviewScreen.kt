@@ -45,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
+import com.tuxunxiangqi.android.data.sourceLabel
+import com.tuxunxiangqi.android.data.sourceNote
 import com.tuxunxiangqi.android.data.toPortableText
 import com.tuxunxiangqi.android.engine.AnalysisResult
 import com.tuxunxiangqi.android.engine.PikafishEngine
@@ -342,7 +344,9 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            text = liveRecord.modeLabel + " · " + liveRecord.resultText,
+            text = liveRecord.modeLabel + " · " + liveRecord.resultText +
+                " · " + liveRecord.sourceLabel() +
+                liveRecord.sourceNote().let { if (it.isEmpty()) "" else " · " + it },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

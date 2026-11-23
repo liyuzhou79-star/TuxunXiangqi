@@ -43,6 +43,7 @@ import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.data.filterRecords
 import com.tuxunxiangqi.android.data.sortRecords
 import com.tuxunxiangqi.android.data.parsePortableRecords
+import com.tuxunxiangqi.android.data.sourceLabel
 import com.tuxunxiangqi.android.data.toPortableText
 import com.tuxunxiangqi.android.data.toPortableTextBundle
 import java.text.SimpleDateFormat
@@ -320,7 +321,7 @@ fun RecordsScreen(
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = dateFmt.format(Date(r.dateMs)) + " · 共 " +
-                                    r.movesUci.size + " 手 · " + r.resultText,
+                                    r.movesUci.size + " 手 · " + r.resultText + " · " + r.sourceLabel(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -343,7 +344,7 @@ fun RecordsScreen(
                         Spacer(Modifier.height(2.dp))
                         Text(
                             text = dateFmt.format(Date(r.dateMs)) + " · 共 " +
-                                r.movesUci.size + " 手 · " + r.resultText,
+                                r.movesUci.size + " 手 · " + r.resultText + " · " + r.sourceLabel(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

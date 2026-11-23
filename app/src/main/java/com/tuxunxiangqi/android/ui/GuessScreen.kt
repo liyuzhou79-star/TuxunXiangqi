@@ -241,12 +241,14 @@ fun GuessScreen(onBack: () -> Unit) {
                 guessUci == best.moveUci -> {
                     SoundFx.play(context, SoundKind.GOOD)
                     correct++
-                    if (wrongFen == currentFen) {
+                    val wasRetry = wrongFen == currentFen
+                    if (wasRetry) {
                         wrongStore.remove(currentFen)
                         wrongList = wrongStore.loadAll()
                         wrongFen = null
                     }
-                    "猜中了！「$guessText」正是引擎一选。"
+                    "猜中了！「$guessText」正是引擎一选。" +
+                        if (wasRetry) "这题已移出错题本。" else ""
                 }
                 guessRank != null -> {
                     SoundFx.play(context, SoundKind.BAD)
@@ -256,7 +258,8 @@ fun GuessScreen(onBack: () -> Unit) {
                         )
                         wrongList = wrongStore.loadAll()
                     }
-                    "「$guessText」进了引擎前四（第 $guessRank 位），但一选是「$bestText」。这题已收进错题本。"
+                    "「$guessText」进了引擎前四（第 $guessRank 位），但一选是「$bestText」。" +
+                        if (wrongFen == currentFen) "这题继续留在错题本里。" else "这题已收进错题本。"
                 }
                 else -> {
                     SoundFx.play(context, SoundKind.BAD)
@@ -266,7 +269,8 @@ fun GuessScreen(onBack: () -> Unit) {
                         )
                         wrongList = wrongStore.loadAll()
                     }
-                    "「$guessText」没进引擎前四。一选是「$bestText」。这题已收进错题本。"
+                    "「$guessText」没进引擎前四。一选是「$bestText」。" +
+                        if (wrongFen == currentFen) "这题继续留在错题本里。" else "这题已收进错题本。"
                 }
             }
         }

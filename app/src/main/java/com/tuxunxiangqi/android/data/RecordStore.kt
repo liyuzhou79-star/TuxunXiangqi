@@ -1,6 +1,9 @@
 package com.tuxunxiangqi.android.data
 
 import android.content.Context
+import com.tuxunxiangqi.android.xiangqi.Fen
+import com.tuxunxiangqi.android.xiangqi.GameState
+import com.tuxunxiangqi.android.xiangqi.OpeningBook
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -125,13 +128,76 @@ class RecordStore(context: Context) {
     }
 }
 
+/** Position key of a FEN: board layout plus side to move. The
+ *  halfmove/fullmove counters are excluded on purpose — records
+ *  always store fullmove 1 for their start position while a
+ *  replayed book line counts real fullmoves, so the counters
+ *  would never match even for the very same position. */
+fun fenPositionKey(fen: String): String {
+    val fields = fen.trim().split(Regex("\\s+"))
+    return when {
+        fields.size >= 2 -> fields[0] + " " + fields[1]
+        fields.size == 1 -> fields[0]
+        else -> ""
+    }
+}
+
+/** Position key -> the book history reaching it, for every node
+ *  in the opening book (the root entry is the standard start).
+ *  Built once by replaying each line on the real state machine. */
+private val bookPositionHistories: Map<String, List<String>> by lazy {
+    val map = LinkedHashMap<String, List<String>>()
+    for (node in OpeningBook.allNodes()) {
+        val gs = GameState()
+        var ok = true
+        for (uci in node.historyUci) {
+            val ft = Fen.parseUciMove(uci)
+            if (ft == null || !gs.tryMove(ft.first, ft.second)) {
+                ok = false
+                break
+            }
+        }
+        if (ok) map.putIfAbsent(fenPositionKey(Fen.toFen(gs)), node.historyUci)
+    }
+    map
+}
+
+private val standardStartKey: String by lazy {
+    fenPositionKey(Fen.toFen(GameState()))
+}
+
+/** Where this record's start position came from, judged purely
+ *  by the position itself: the standard start, a position the
+ *  built-in opening book reaches (a game started from a book
+ *  node), or anything else — a hand-set editor position, which
+ *  is also where imported records with unknown positions land.
+ *  Pinned by RecordSourceTest. */
+fun GameRecord.sourceLabel(): String {
+    val key = fenPositionKey(initialFen)
+    if (key.isEmpty()) return "摆棋开局"
+    if (key == standardStartKey) return "标准开局"
+    val hist = bookPositionHistories[key]
+    return if (hist != null && hist.isNotEmpty()) "定式开局" else "摆棋开局"
+}
+
+/** For a book start, the book line that reaches the position,
+ *  in Chinese notation; empty for the other sources. */
+fun GameRecord.sourceNote(): String {
+    val key = fenPositionKey(initialFen)
+    if (key.isEmpty() || key == standardStartKey) return ""
+    val hist = bookPositionHistories[key] ?: return ""
+    if (hist.isEmpty()) return ""
+    return OpeningBook.historyNotation(hist).joinToString(" · ")
+}
+
 /** The library screen's filter: mode chip, result chip and a
- *  free-text match on title or result. Result chips match the
- *  resultText prefixes BoardScreen writes ("红方胜 · …",
- *  "黑方胜 · …", "和棋 · …"); "未分胜负" keeps the rest
- *  (mid-game saves and result-less finishes). Pure and
- *  allocation-light so a library of hundreds of records
- *  filters instantly; pinned by RecordsPerfTest at 200 records. */
+ *  free-text match on title, result or start-position source.
+ *  Result chips match the resultText prefixes BoardScreen
+ *  writes ("红方胜 · …", "黑方胜 · …", "和棋 · …"); "未分胜负"
+ *  keeps the rest (mid-game saves and result-less finishes).
+ *  Pure and allocation-light so a library of hundreds of
+ *  records filters instantly; pinned by RecordsPerfTest at
+ *  200 records. */
 fun filterRecords(
     records: List<GameRecord>,
     filter: String,
@@ -148,7 +214,8 @@ fun filterRecords(
             else -> r.resultText.startsWith(result)
         }
         (filter == "全部" || r.modeLabel.startsWith(filter)) && resultOk &&
-            (q.isBlank() || r.title.contains(q) || r.resultText.contains(q))
+            (q.isBlank() || r.title.contains(q) || r.resultText.contains(q) ||
+                r.sourceLabel().contains(q))
     }
 }
 
