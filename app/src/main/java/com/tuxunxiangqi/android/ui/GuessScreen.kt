@@ -85,6 +85,15 @@ fun GuessScreen(onBack: () -> Unit) {
     var secondsLeft by remember { mutableStateOf(30) }
     var questionId by remember { mutableStateOf(0) }
 
+    // The round score belongs to one source + mode combination
+    // (1.13.0 alignment): switching the source or the timed
+    // toggle starts a fresh round instead of mixing two kinds
+    // of answers into one line. Lifetime stats are unaffected.
+    LaunchedEffect(source, timed) {
+        asked = 0
+        correct = 0
+    }
+
     fun loadPosition(fen: String, label: String, wrong: Boolean = false) {
         wrongFen = if (wrong) fen else null
         val parsed = Fen.fromFen(fen)
@@ -320,7 +329,8 @@ fun GuessScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "本轮成绩：猜对 $correct / 共 $asked 题",
+            text = "本轮成绩" + (if (timed) "（限时）" else "") +
+                "：猜对 $correct / 共 $asked 题",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )

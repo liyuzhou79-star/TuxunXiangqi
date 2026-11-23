@@ -11,9 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.GameRecord
 import com.tuxunxiangqi.android.data.RecordStore
+import com.tuxunxiangqi.android.data.filterRecords
 import com.tuxunxiangqi.android.data.parsePortableRecord
 import com.tuxunxiangqi.android.data.toPortableText
 import java.text.SimpleDateFormat
@@ -115,76 +117,83 @@ fun RecordsScreen(
         }
     }
 
-    val shown = records.filter { r ->
-        (filter == "全部" || r.modeLabel.startsWith(filter)) &&
-            (query.isBlank() || r.title.contains(query) || r.resultText.contains(query))
+    val shown = remember(records, filter, query) {
+        filterRecords(records, filter, query)
     }
+    val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+    // LazyColumn (1.13.0): with a few hundred records the old
+    // eager Column composed every card at once and the page
+    // opened slowly; now only the visible cards are composed.
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = "棋谱",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "对局结束会自动存到这里；点开任意一局就能复盘。棋谱可以导出成文本或文件，换手机也不怕丢。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("搜索棋谱") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(10.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (f in listOf("全部", "人机对弈", "人人对弈", "AI 表演赛")) {
-                FilterChip(
-                    selected = filter == f,
-                    onClick = { filter = f },
-                    label = { Text(f) }
+        item {
+            Column {
+                Text(
+                    text = "棋谱",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
                 )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "对局结束会自动存到这里；点开任意一局就能复盘。棋谱可以导出成文本或文件，换手机也不怕丢。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("搜索棋谱") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (f in listOf("全部", "人机对弈", "人人对弈", "AI 表演赛")) {
+                        FilterChip(
+                            selected = filter == f,
+                            onClick = { filter = f },
+                            label = { Text(f) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { importOpen = true }) { Text("粘贴导入") }
+                    OutlinedButton(onClick = {
+                        importFileLauncher.launch(arrayOf("text/plain", "text/*"))
+                    }) { Text("从文件导入") }
+                }
+                Spacer(Modifier.height(4.dp))
             }
         }
-        Spacer(Modifier.height(10.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { importOpen = true }) { Text("粘贴导入") }
-            OutlinedButton(onClick = {
-                importFileLauncher.launch(arrayOf("text/plain", "text/*"))
-            }) { Text("从文件导入") }
-        }
-        Spacer(Modifier.height(14.dp))
 
         if (shown.isEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = if (records.isEmpty()) {
-                        "还没有棋谱。去下一局，结束时会自动存进来；下到一半也可以在对局页点「存谱」。"
-                    } else {
-                        "没有符合条件的棋谱，换个筛选或搜索词试试。"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(16.dp)
-                )
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (records.isEmpty()) {
+                            "还没有棋谱。去下一局，结束时会自动存进来；下到一半也可以在对局页点「存谱」。"
+                        } else {
+                            "没有符合条件的棋谱，换个筛选或搜索词试试。"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
             }
         }
 
-        val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA) }
-        for (r in shown) {
+        items(shown, key = { it.id }) { r ->
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -229,12 +238,15 @@ fun RecordsScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(10.dp))
         }
 
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onBack) { Text("返回") }
-        Spacer(Modifier.height(24.dp))
+        item {
+            Column {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onBack) { Text("返回") }
+                Spacer(Modifier.height(24.dp))
+            }
+        }
     }
 
     if (renameTarget != null) {

@@ -117,6 +117,22 @@ class RecordStore(context: Context) {
     }
 }
 
+/** The library screen's filter: mode chip plus a free-text
+ *  match on title or result. Pure and allocation-light so a
+ *  library of hundreds of records filters instantly; pinned by
+ *  RecordsPerfTest at 200 records. */
+fun filterRecords(
+    records: List<GameRecord>,
+    filter: String,
+    query: String
+): List<GameRecord> {
+    val q = query.trim()
+    return records.filter { r ->
+        (filter == "全部" || r.modeLabel.startsWith(filter)) &&
+            (q.isBlank() || r.title.contains(q) || r.resultText.contains(q))
+    }
+}
+
 /** Serialises one record into the portable text format used for
  *  export/import: header lines plus a UCI move line, so a record
  *  can travel by clipboard, share sheet or file. */

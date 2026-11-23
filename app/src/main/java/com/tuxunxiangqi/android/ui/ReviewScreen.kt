@@ -1,6 +1,5 @@
 package com.tuxunxiangqi.android.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,7 +43,6 @@ import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.Notation
 import com.tuxunxiangqi.android.xiangqi.Piece
-import com.tuxunxiangqi.android.xiangqi.Pos
 import com.tuxunxiangqi.android.xiangqi.Side
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -119,12 +118,46 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     // back shows it again without re-running the engine.
     val deepCache = remember { mutableStateMapOf<Int, AnalysisResult>() }
     val deepErrors = remember { mutableStateMapOf<Int, String>() }
-    // Candidate tapped in the deep card: its move is previewed
-    // as the board arrow instead of the top candidate.
-    var deepPreview by remember { mutableStateOf<Pair<Pos, Pos>?>(null) }
+    // Candidate selection in the deep card, unified with the
+    // in-game analysis panel (1.13.0): one candidate is always
+    // selected (the top one by default), tapping a card switches
+    // the board arrow to that candidate, and each card carries a
+    // trial-walk button that replays the candidate's PV on a
+    // scratch board — exactly like BoardScreen's preview.
+    var deepSelectedRank by remember { mutableStateOf<Int?>(null) }
+    var deepTrialRank by remember { mutableStateOf<Int?>(null) }
+    var deepTrialStep by remember { mutableStateOf(0) }
+    val deepTrialState = remember { GameState() }
+
+    fun exitDeepTrial() {
+        deepTrialRank = null
+        deepTrialStep = 0
+    }
+
+    /** Rebuilds the trial board: the position at the current
+     *  step plus the first [step] moves of the candidate's PV.
+     *  Rebuilding from scratch keeps stepping correct both ways;
+     *  the replayed record itself is never touched. */
+    fun applyDeepTrial(cand: com.tuxunxiangqi.android.engine.Candidate, step: Int) {
+        deepTrialState.loadPosition(displayState.cells.toList(), displayState.turn)
+        val pv = cand.pvUci.take(12)
+        val n = step.coerceIn(0, pv.size)
+        for (i in 0 until n) {
+            val mv = Fen.parseUciMove(pv[i]) ?: break
+            if (!deepTrialState.tryMove(mv.first, mv.second)) break
+        }
+        deepTrialStep = n
+    }
+
+    fun startDeepTrial(cand: com.tuxunxiangqi.android.engine.Candidate) {
+        deepSelectedRank = cand.rank
+        deepTrialRank = cand.rank
+        applyDeepTrial(cand, 1)
+    }
 
     fun startBatchAnalysis() {
         if (batchRunning || maxIdx == 0) return
+        exitDeepTrial()
         batchCancel.set(false)
         batchRunning = true
         batchDone = 0
@@ -197,6 +230,8 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
 
     fun startDeepAnalysis() {
         if (deepBusy || batchRunning) return
+        exitDeepTrial()
+        deepSelectedRank = null
         deepBusy = true
         deepIdx = idx
         val atIdx = idx
@@ -213,7 +248,10 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(idx) { deepPreview = null }
+    LaunchedEffect(idx) {
+        deepSelectedRank = null
+        exitDeepTrial()
+    }
 
     // Recorded evals as (moveCount, redCp) points for the chart.
     val trendPoints = remember(liveRecord.evals) {
@@ -280,21 +318,83 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
         )
         Spacer(Modifier.height(12.dp))
 
+        val deepNow = deepCache[idx]
+        val trialCand = deepNow?.candidates?.firstOrNull { it.rank == deepTrialRank }
+        val trialPv = trialCand?.pvUci?.take(12) ?: emptyList()
+        val trialNextHint = if (trialCand != null && deepTrialStep < trialPv.size) {
+            Fen.parseUciMove(trialPv[deepTrialStep])
+        } else {
+            null
+        }
+        val selectedCand = deepNow?.candidates?.firstOrNull {
+            it.rank == deepSelectedRank
+        } ?: deepNow?.candidates?.firstOrNull()
+
         BoardFrame(modifier = Modifier.fillMaxWidth()) {
             XiangqiBoard(
-                state = displayState,
+                state = if (trialCand != null) deepTrialState else displayState,
                 selected = null,
                 legalTargets = emptyList(),
-                hint = deepPreview
-                    ?: deepCache[idx]?.candidates?.firstOrNull()?.let {
-                        Fen.parseUciMove(it.moveUci)
-                    },
+                hint = if (trialCand != null) {
+                    trialNextHint
+                } else {
+                    selectedCand?.let { Fen.parseUciMove(it.moveUci) }
+                },
                 onTap = {}
             )
         }
 
+        if (trialCand != null) {
+            Spacer(Modifier.height(10.dp))
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "试走这条变化：第 $deepTrialStep/${trialPv.size} 步",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = trialNextHint?.let {
+                            "下一步：" + Notation.moveText(
+                                deepTrialState.cells, it.first, it.second
+                            )
+                        } ?: "这条变化已经走完。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { applyDeepTrial(trialCand, deepTrialStep - 1) },
+                            enabled = deepTrialStep > 0
+                        ) { Text("上一步") }
+                        OutlinedButton(
+                            onClick = { applyDeepTrial(trialCand, deepTrialStep + 1) },
+                            enabled = deepTrialStep < trialPv.size
+                        ) { Text("下一步") }
+                        TextButton(onClick = { exitDeepTrial() }) { Text("退出试走") }
+                    }
+                    Text(
+                        text = "试走只是把引擎的变化摆出来看，不会改动棋谱；切换步数会自动回到复盘局面。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
-        CapturedStrip(snapshots[0].first, snapshots[idx].first)
+        if (trialCand != null) {
+            CapturedStrip(snapshots[idx].first, deepTrialState.cells.toList())
+        } else {
+            CapturedStrip(snapshots[0].first, snapshots[idx].first)
+        }
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -474,7 +574,8 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "点任意候选，棋盘上会画出那一步的箭头；再点一次取消。",
+                                text = "点任意候选，棋盘箭头会换成那一步；" +
+                                    "点候选卡里的「试走这条线」，可以一步步摆出后续变化。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme
                                     .colorScheme.onSurfaceVariant
@@ -491,36 +592,65 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                                 val (redCp, redMate) = EvalUtil.toRedPerspective(
                                     cand.scoreCp, cand.mateIn, displayState.turn
                                 )
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text = "第 ${cand.rank} 选：$title · " +
-                                        EvalUtil.describeRed(redCp, redMate),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (mv != null && deepPreview == mv) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        androidx.compose.ui.graphics.Color.Unspecified
-                                    },
-                                    modifier = if (mv != null) {
-                                        Modifier.clickable {
-                                            deepPreview =
-                                                if (deepPreview == mv) null else mv
-                                        }
-                                    } else {
-                                        Modifier
-                                    }
-                                )
                                 val pv = Notation.pvText(
                                     displayState.cells, cand.pvUci, 5
                                 ).joinToString(" ")
-                                if (pv.isNotBlank()) {
-                                    Text(
-                                        text = "变化：$pv",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme
-                                            .colorScheme.onSurfaceVariant
-                                    )
+                                Spacer(Modifier.height(6.dp))
+                                Card(
+                                    onClick = {
+                                        if (mv != null) {
+                                            deepSelectedRank = cand.rank
+                                        }
+                                    },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (
+                                            cand.rank == (deepSelectedRank ?: 1)
+                                        ) {
+                                            MaterialTheme.colorScheme
+                                                .primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme
+                                                .surfaceContainerHighest
+                                        }
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(
+                                            text = "第 ${cand.rank} 选：$title",
+                                            style = MaterialTheme
+                                                .typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = EvalUtil.describeRed(
+                                                redCp, redMate
+                                            ),
+                                            style = MaterialTheme
+                                                .typography.bodyMedium,
+                                            color = MaterialTheme
+                                                .colorScheme.onSurfaceVariant
+                                        )
+                                        if (pv.isNotBlank()) {
+                                            Text(
+                                                text = "变化：$pv",
+                                                style = MaterialTheme
+                                                    .typography.bodySmall,
+                                                color = MaterialTheme
+                                                    .colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        FlowRow(
+                                            horizontalArrangement =
+                                                Arrangement.End
+                                        ) {
+                                            TextButton(
+                                                onClick = {
+                                                    startDeepTrial(cand)
+                                                }
+                                            ) { Text("试走这条线") }
+                                        }
+                                    }
                                 }
                             }
                             val actualUci = liveRecord.movesUci.getOrNull(idx)
