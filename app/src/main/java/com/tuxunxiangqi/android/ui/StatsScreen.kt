@@ -38,6 +38,10 @@ fun StatsScreen(onBack: () -> Unit) {
             .mapNotNull { it.toIntOrNull() }.toSet()
     }
     val solvedCount = solvedIds.size
+    val assistedCount = remember {
+        val p = context.getSharedPreferences("puzzles", Context.MODE_PRIVATE)
+        solvedIds.count { p.getBoolean("assisted_$it", false) }
+    }
     val guessStats = remember { GuessStatsStore(context) }
     val guessTotal = remember { guessStats.total() }
 
@@ -133,7 +137,8 @@ fun StatsScreen(onBack: () -> Unit) {
 
         StatsCard(title = "训练进度") {
             Text(
-                text = "残局题解出 $solvedCount / " + Puzzles.all.size + " 题",
+                text = "残局题解出 $solvedCount / " + Puzzles.all.size + " 题" +
+                    if (assistedCount > 0) "（其中 $assistedCount 题用过提示）" else "",
                 style = MaterialTheme.typography.bodyMedium
             )
             for (cat in Puzzles.categoryOrder) {

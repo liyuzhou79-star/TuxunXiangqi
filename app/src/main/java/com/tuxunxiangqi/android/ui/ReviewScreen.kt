@@ -1,5 +1,6 @@
 package com.tuxunxiangqi.android.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -111,8 +113,14 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     // it is never written back into the stored record.
     var deepBusy by remember { mutableStateOf(false) }
     var deepIdx by remember { mutableStateOf(-1) }
-    var deepResult by remember { mutableStateOf<AnalysisResult?>(null) }
-    var deepError by remember { mutableStateOf<String?>(null) }
+    // Results are cached per step: deep-analysing another step
+    // no longer throws away the earlier step's card, and stepping
+    // back shows it again without re-running the engine.
+    val deepCache = remember { mutableStateMapOf<Int, AnalysisResult>() }
+    val deepErrors = remember { mutableStateMapOf<Int, String>() }
+    // Candidate tapped in the deep card: its move is previewed
+    // as the board arrow instead of the top candidate.
+    var deepPreview by remember { mutableStateOf<Pair<Pos, Pos>?>(null) }
 
     fun startBatchAnalysis() {
         if (batchRunning || maxIdx == 0) return
@@ -189,20 +197,22 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
     fun startDeepAnalysis() {
         if (deepBusy || batchRunning) return
         deepBusy = true
-        deepError = null
-        deepResult = null
         deepIdx = idx
         val atIdx = idx
+        deepErrors.remove(atIdx)
         engine.analyze(Fen.toFen(displayState), 2000, multiPv = 4) { res, err ->
             deepBusy = false
-            if (deepIdx != atIdx) return@analyze
+            // Cached under the analysed step even if the user has
+            // stepped elsewhere meanwhile — nothing is thrown away.
             when {
-                err != null -> deepError = err
-                res != null -> deepResult = res
-                else -> deepError = "引擎暂时没给出候选。"
+                err != null -> deepErrors[atIdx] = err
+                res != null -> deepCache[atIdx] = res
+                else -> deepErrors[atIdx] = "引擎暂时没给出候选。"
             }
         }
     }
+
+    LaunchedEffect(idx) { deepPreview = null }
 
     // Recorded evals as (moveCount, redCp) points for the chart.
     val trendPoints = remember(liveRecord.evals) {
@@ -274,13 +284,10 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                 state = displayState,
                 selected = null,
                 legalTargets = emptyList(),
-                hint = if (deepIdx == idx) {
-                    deepResult?.candidates?.firstOrNull()?.let {
+                hint = deepPreview
+                    ?: deepCache[idx]?.candidates?.firstOrNull()?.let {
                         Fen.parseUciMove(it.moveUci)
-                    }
-                } else {
-                    null
-                },
+                    },
                 onTap = {}
             )
         }
@@ -437,14 +444,15 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (deepIdx == idx && deepError != null) {
+                val deepError = deepErrors[idx]
+                if (deepError != null) {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "深析没能完成：$deepError",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                val deep = if (deepIdx == idx) deepResult else null
+                val deep = deepCache[idx]
                 if (deep != null) {
                     Spacer(Modifier.height(10.dp))
                     Card(
@@ -464,6 +472,12 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
+                            Text(
+                                text = "点任意候选，棋盘上会画出那一步的箭头；再点一次取消。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme
+                                    .colorScheme.onSurfaceVariant
+                            )
                             for (cand in deep.candidates) {
                                 val mv = Fen.parseUciMove(cand.moveUci)
                                 val title = if (mv != null) {
@@ -481,7 +495,20 @@ fun ReviewScreen(record: GameRecord, onBack: () -> Unit) {
                                     text = "第 ${cand.rank} 选：$title · " +
                                         EvalUtil.describeRed(redCp, redMate),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (mv != null && deepPreview == mv) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        androidx.compose.ui.graphics.Color.Unspecified
+                                    },
+                                    modifier = if (mv != null) {
+                                        Modifier.clickable {
+                                            deepPreview =
+                                                if (deepPreview == mv) null else mv
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
                                 )
                                 val pv = Notation.pvText(
                                     displayState.cells, cand.pvUci, 5
