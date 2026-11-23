@@ -790,6 +790,43 @@ fun ReviewScreen(
                         }
                     }
                 }
+                // Deep-step overview (1.34.0): every step that
+                // already has a stored deep result, as jump
+                // chips — now that deep results persist with the
+                // record, they need a way back in besides stepping
+                // through the whole game.
+                val deepSteps = remember(liveRecord.deep, deepCache.keys.size) {
+                    (liveRecord.deep.keys + deepCache.keys)
+                        .filter { it in 0..maxIdx }
+                        .distinct().sorted()
+                }
+                if (deepSteps.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "已深析的步（点任意一步跳过去看）：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        for (step in deepSteps) {
+                            OutlinedButton(onClick = {
+                                playing = false
+                                replayStopAt = null
+                                idx = step
+                                scope.launch { pageScroll.animateScrollTo(0) }
+                            }) {
+                                Text(
+                                    if (step == 0) "初始局面"
+                                    else "第 $step 步"
+                                )
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(

@@ -315,7 +315,8 @@ fun filterRecords(
     records: List<GameRecord>,
     filter: String,
     query: String,
-    result: String = "全部结果"
+    result: String = "全部结果",
+    deepOnly: Boolean = false
 ): List<GameRecord> {
     val q = query.trim()
     return records.filter { r ->
@@ -327,6 +328,7 @@ fun filterRecords(
             else -> r.resultText.startsWith(result)
         }
         (filter == "全部" || r.modeLabel.startsWith(filter)) && resultOk &&
+            (!deepOnly || r.deep.isNotEmpty()) &&
             (q.isBlank() || r.title.contains(q) || r.resultText.contains(q) ||
                 r.sourceLabel().contains(q))
     }

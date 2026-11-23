@@ -18,6 +18,35 @@ import org.junit.Test
  *  regressions, not to micro-benchmark. */
 class RecordsPerfTest {
 
+    @Test
+    fun deepOnlyFilterKeepsOnlyAnalysedRecords() {
+        // The 1.34.0 library chip: only records carrying stored
+        // deep results survive, and it composes with the other
+        // dimensions instead of replacing them.
+        fun rec(id: Long, deepSteps: Int) = GameRecord(
+            id = id,
+            title = "局 $id",
+            dateMs = id,
+            modeLabel = "人机对弈 · 普通",
+            resultText = "红方胜",
+            initialFen = "4k4/9/9/9/9/9/9/9/9/4K4 w - - 0 1",
+            movesUci = listOf("h2e2"),
+            evals = emptyMap(),
+            deep = (0 until deepSteps).associateWith { "h2e2,c10," }
+        )
+        val records = listOf(rec(1, 0), rec(2, 1), rec(3, 3))
+        assertEquals(3, filterRecords(records, "全部", "").size)
+        assertEquals(
+            listOf(2L, 3L),
+            filterRecords(records, "全部", "", "全部结果", deepOnly = true)
+                .map { it.id }
+        )
+        assertEquals(
+            0,
+            filterRecords(records, "全部", "", "黑方胜", deepOnly = true).size
+        )
+    }
+
     private fun makeRecords(n: Int): List<GameRecord> {
         val modes = listOf("人机对弈 · 普通", "人人对弈", "AI 表演赛")
         val moves = (1..120).map { "h2e2" }

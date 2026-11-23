@@ -77,6 +77,9 @@ fun RecordsScreen(
     var filter by remember { mutableStateOf("全部") }
     var resultFilter by remember { mutableStateOf("全部结果") }
     var sortOrder by remember { mutableStateOf("最新在前") }
+    // Deep-analysis filter (1.34.0): narrow the library to the
+    // records that carry stored deep results.
+    var deepOnly by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<GameRecord?>(null) }
     var renameText by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<GameRecord?>(null) }
@@ -147,8 +150,11 @@ fun RecordsScreen(
         }
     }
 
-    val shown = remember(records, filter, query, resultFilter, sortOrder) {
-        sortRecords(filterRecords(records, filter, query, resultFilter), sortOrder)
+    val shown = remember(records, filter, query, resultFilter, sortOrder, deepOnly) {
+        sortRecords(
+            filterRecords(records, filter, query, resultFilter, deepOnly),
+            sortOrder
+        )
     }
     val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA) }
 
@@ -232,6 +238,12 @@ fun RecordsScreen(
                         ) { Text(label) }
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                FilterChip(
+                    selected = deepOnly,
+                    onClick = { deepOnly = !deepOnly },
+                    label = { Text("只看有深析的棋谱") }
+                )
                 Spacer(Modifier.height(10.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { importOpen = true }) { Text("粘贴导入") }
@@ -352,7 +364,8 @@ fun RecordsScreen(
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = dateFmt.format(Date(r.dateMs)) + " · 共 " +
-                                    r.movesUci.size + " 手 · " + r.resultText + " · " + r.sourceLabel(),
+                                    r.movesUci.size + " 手 · " + r.resultText + " · " + r.sourceLabel() +
+                                    if (r.deep.isNotEmpty()) " · 深析 " + r.deep.size + " 步" else "",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -375,7 +388,8 @@ fun RecordsScreen(
                         Spacer(Modifier.height(2.dp))
                         Text(
                             text = dateFmt.format(Date(r.dateMs)) + " · 共 " +
-                                r.movesUci.size + " 手 · " + r.resultText + " · " + r.sourceLabel(),
+                                r.movesUci.size + " 手 · " + r.resultText + " · " + r.sourceLabel() +
+                                    if (r.deep.isNotEmpty()) " · 深析 " + r.deep.size + " 步" else "",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

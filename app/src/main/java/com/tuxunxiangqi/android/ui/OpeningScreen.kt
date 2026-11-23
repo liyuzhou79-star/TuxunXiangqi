@@ -191,16 +191,29 @@ fun OpeningScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
+                    // The line name leads (1.34.0) when the node
+                    // belongs to a named line, with the move list
+                    // as the subtitle; unnamed nodes keep the
+                    // move list as the title, as before.
+                    val lineName = OpeningBook.lineName(node.historyUci)
                     Text(
-                        text = if (node.historyUci.isEmpty()) {
-                            "起始局面"
-                        } else {
-                            OpeningBook.historyNotation(node.historyUci)
+                        text = when {
+                            node.historyUci.isEmpty() -> "起始局面"
+                            lineName != null -> lineName
+                            else -> OpeningBook.historyNotation(node.historyUci)
                                 .joinToString(" · ")
                         },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
+                    if (lineName != null && node.historyUci.isNotEmpty()) {
+                        Text(
+                            text = OpeningBook.historyNotation(node.historyUci)
+                                .joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = node.suggestions.joinToString(" · ") { it.second },
