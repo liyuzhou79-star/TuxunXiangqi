@@ -219,3 +219,64 @@ fun applyBackupJson(context: Context, text: String): String? {
     return "恢复完成：棋谱 " + records.size + " 局，错题 " + wrong.size +
         " 道，设置已覆盖" + progressNote + "。主题若有变化，回到首页即可看到。"
 }
+
+/** Training-only portable document (1.30.0): puzzle progress
+ *  and guess statistics, nothing else — for moving just the
+ *  training record between devices, without touching games,
+ *  the wrong book or settings. */
+fun buildTrainingJson(context: Context): String {
+    val root = JSONObject()
+    root.put("app", "jiang-xiangqi-training")
+    root.put("version", 1)
+    root.put("puzzles", PuzzleProgressStore(context).load().encode())
+    root.put("guessStats", encodeGuessStats(GuessStatsStore(context).allStats()))
+    return root.toString()
+}
+
+/** Decodes the two training fields of a portable document.
+ *  Pure and pinned by unit tests: each field applies only when
+ *  present and parseable; null when neither is usable, so a
+ *  document with no training data changes nothing. */
+fun decodeTraining(
+    puzzleText: String?,
+    guessText: String?
+): Pair<PuzzleProgress?, Map<String, GuessStat>?>? {
+    val p = puzzleText?.takeIf { it.isNotBlank() }
+        ?.let { parsePuzzleProgress(it) }
+    val g = guessText?.takeIf { it.isNotBlank() }
+        ?.let { parseGuessStats(it) }
+    if (p == null && g == null) return null
+    return p to g
+}
+
+/** Applies a training document — or the training fields of a
+ *  full backup, which carry the same two keys. Records, the
+ *  wrong book and settings are never touched. Returns a
+ *  result line, or null when the text is not a portable
+ *  document or carries no usable training data. */
+fun applyTrainingJson(context: Context, text: String): String? {
+    val root = try {
+        JSONObject(text)
+    } catch (_: Exception) {
+        return null
+    }
+    val app = root.optString("app")
+    if (app != "jiang-xiangqi-training" && app != "jiang-xiangqi-backup") {
+        return null
+    }
+    val decoded = decodeTraining(
+        root.optString("puzzles").ifBlank { null },
+        root.optString("guessStats").ifBlank { null }
+    ) ?: return null
+    val notes = ArrayList<String>()
+    decoded.first?.let {
+        PuzzleProgressStore(context).replaceAll(it)
+        notes.add("残局进度 " + it.solvedIds.size + " 题")
+    }
+    decoded.second?.let {
+        GuessStatsStore(context).replaceAll(it)
+        notes.add("猜一选统计")
+    }
+    return "训练数据已导入：" + notes.joinToString("，") +
+        "。棋谱、错题本和设置都没有动。"
+}

@@ -133,11 +133,16 @@ fun GuessScreen(onBack: () -> Unit) {
 
     fun newQuestion() {
         when (source) {
-            "简单", "普通", "困难" -> {
+            "简单", "普通", "困难", "开局" -> {
                 val list = when (source) {
                     "简单" -> GuessPositions.easy
                     "困难" -> GuessPositions.hard
+                    "开局" -> GuessPositions.opening
                     else -> GuessPositions.normal
+                }
+                if (list.isEmpty()) {
+                    notice = "开局题库暂时没能生成，换个来源试试。"
+                    return
                 }
                 rotation++
                 val pick = list[(rotation + Random.nextInt(list.size)) % list.size]
@@ -338,7 +343,7 @@ fun GuessScreen(onBack: () -> Unit) {
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             val options = listOf(
                 "简单" to "简单", "普通" to "普通", "困难" to "困难",
-                "我的棋谱" to "棋谱", "错题本" to "错题"
+                "开局" to "开局", "我的棋谱" to "棋谱", "错题本" to "错题"
             )
             options.forEachIndexed { index, (value, label) ->
                 SegmentedButton(
@@ -356,6 +361,8 @@ fun GuessScreen(onBack: () -> Unit) {
                     "困难" -> GuessPositions.hard.size
                     else -> GuessPositions.normal.size
                 } + " 题，随机抽题，答过的也可能再遇到。"
+                "开局" -> "「开局」题库共 " + GuessPositions.opening.size +
+                    " 题，都是经典定式走完 4 到 6 手后的局面，轮到哪方走棋看题面。"
                 "我的棋谱" -> "能出题的棋谱共 " + usableRecords +
                     " 局（8 手以上），从对局中段随机出题。"
                 else -> "错题本共 " + wrongList.size + " 题，猜中一选就移出。"

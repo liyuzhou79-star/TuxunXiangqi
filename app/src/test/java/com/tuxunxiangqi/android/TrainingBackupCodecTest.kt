@@ -3,6 +3,7 @@ package com.tuxunxiangqi.android
 import com.tuxunxiangqi.android.data.GuessStat
 import com.tuxunxiangqi.android.data.PuzzleProgress
 import com.tuxunxiangqi.android.data.dailyStreak
+import com.tuxunxiangqi.android.data.decodeTraining
 import com.tuxunxiangqi.android.data.encodeGuessStats
 import com.tuxunxiangqi.android.data.parseGuessStats
 import com.tuxunxiangqi.android.data.parsePuzzleProgress
@@ -112,5 +113,30 @@ class TrainingBackupCodecTest {
         // One bad entry does not sink the good ones.
         val parsed = parseGuessStats("简单=1,2,3;普通=oops")
         assertEquals(mapOf("简单" to GuessStat(1, 2, 3)), parsed)
+    }
+
+    @Test
+    fun openingBucketRoundTrips() {
+        // The 开局 source (1.30.0) is a first-class stats
+        // bucket: it encodes in canonical order and parses back.
+        val stats = mapOf("开局" to GuessStat(asked = 4, bestHits = 1, top4 = 2))
+        assertEquals("开局=4,1,2", encodeGuessStats(stats))
+        assertEquals(stats, parseGuessStats("开局=4,1,2"))
+    }
+
+    @Test
+    fun decodeTrainingAppliesEachFieldIndependently() {
+        // Both fields good: both come back.
+        val both = decodeTraining("s=1,5", "简单=2,1,0")
+        assertEquals(setOf(1, 5), both!!.first!!.solvedIds)
+        assertEquals(GuessStat(2, 1, 0), both.second!!["简单"])
+        // One field corrupt: the other still applies.
+        val partial = decodeTraining("garbage", "简单=2,1,0")
+        assertNull(partial!!.first)
+        assertEquals(GuessStat(2, 1, 0), partial.second!!["简单"])
+        // Nothing usable (or nothing there): null, change nothing.
+        assertNull(decodeTraining("garbage", "also garbage"))
+        assertNull(decodeTraining(null, null))
+        assertNull(decodeTraining("", "  "))
     }
 }

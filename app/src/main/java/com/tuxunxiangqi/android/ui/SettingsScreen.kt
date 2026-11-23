@@ -48,7 +48,9 @@ import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.RecordStore
 import com.tuxunxiangqi.android.data.SettingsStore
 import com.tuxunxiangqi.android.data.applyBackupJson
+import com.tuxunxiangqi.android.data.applyTrainingJson
 import com.tuxunxiangqi.android.data.buildBackupJson
+import com.tuxunxiangqi.android.data.buildTrainingJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -80,6 +82,8 @@ fun SettingsScreen(
     var resetOpen by remember { mutableStateOf(false) }
     var importOpen by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
+    var trainingImportOpen by remember { mutableStateOf(false) }
+    var trainingImportText by remember { mutableStateOf("") }
     var clearOpen by remember { mutableStateOf(false) }
     var exportBackup by remember { mutableStateOf(false) }
 
@@ -109,6 +113,24 @@ fun SettingsScreen(
                     toast(result)
                 } else {
                     toast("这个文件不是将！的备份")
+                }
+            } catch (_: Exception) {
+                toast("读取文件失败")
+            }
+        }
+    }
+    val trainingFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val text = context.contentResolver.openInputStream(uri)
+                    ?.bufferedReader()?.readText().orEmpty()
+                val result = applyTrainingJson(context, text)
+                if (result != null) {
+                    toast(result)
+                } else {
+                    toast("这个文件里没有可用的训练数据")
                 }
             } catch (_: Exception) {
                 toast("读取文件失败")
@@ -333,6 +355,26 @@ fun SettingsScreen(
                     importFileLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                 }) { Text("从文件恢复") }
             }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "只搬训练进度时用这一组：只含残局解题进度和猜一选统计，导入也只覆盖这两样，不动棋谱、错题本和设置。粘贴导入时，整份备份文本也能用（只取其中的训练进度）。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    shareText(context, buildTrainingJson(context), "将！训练数据")
+                }) { Text("分享训练数据") }
+                OutlinedButton(onClick = { trainingImportOpen = true }) {
+                    Text("粘贴导入训练数据")
+                }
+                OutlinedButton(onClick = {
+                    trainingFileLauncher.launch(
+                        arrayOf("application/json", "text/plain", "*/*")
+                    )
+                }) { Text("从文件导入训练数据") }
+            }
             Spacer(Modifier.height(10.dp))
             TextButton(onClick = { clearOpen = true }) { Text("清空全部棋谱") }
         }
@@ -419,6 +461,43 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { importOpen = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (trainingImportOpen) {
+        AlertDialog(
+            onDismissRequest = { trainingImportOpen = false },
+            title = { Text("粘贴训练数据导入") },
+            text = {
+                Column {
+                    Text(
+                        text = "把训练数据文本整段粘贴进来（整份备份文本也可以，只取训练进度）。只覆盖残局进度和猜一选统计，棋谱、错题本和设置不动。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = trainingImportText,
+                        onValueChange = { trainingImportText = it },
+                        minLines = 4,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val result = applyTrainingJson(context, trainingImportText)
+                    if (result != null) {
+                        toast(result)
+                        trainingImportOpen = false
+                        trainingImportText = ""
+                    } else {
+                        toast("没认出训练数据，确认粘贴的是完整文本")
+                    }
+                }) { Text("导入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { trainingImportOpen = false }) { Text("取消") }
             }
         )
     }

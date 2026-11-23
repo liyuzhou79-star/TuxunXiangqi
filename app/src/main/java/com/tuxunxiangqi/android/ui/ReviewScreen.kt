@@ -113,6 +113,11 @@ fun ReviewScreen(
 
     var idx by remember { mutableStateOf(0) }
     var playing by remember { mutableStateOf(false) }
+    // Mistake replay (1.30.0): when set, auto-play stops after
+    // stepping to this position index, so a replay that starts
+    // one move before a blunder ends one move after it instead
+    // of running to the end of the game.
+    var replayStopAt by remember { mutableStateOf<Int?>(null) }
     // Hoisted so the move list at the bottom of the page can
     // scroll back to the board after a jump (1.17.0).
     val pageScroll = rememberScrollState()
@@ -254,8 +259,13 @@ fun ReviewScreen(
             delay(1100)
             if (idx >= maxIdx) {
                 playing = false
+                replayStopAt = null
             } else {
                 idx++
+                if (replayStopAt != null && idx >= replayStopAt!!) {
+                    playing = false
+                    replayStopAt = null
+                }
             }
         }
     }
@@ -567,7 +577,12 @@ fun ReviewScreen(
                     HoldButton("后退", enabled = idx > 0) { idx = (idx - 1).coerceAtLeast(0) }
                     HoldButton("前进", enabled = idx < maxIdx) { idx = (idx + 1).coerceAtMost(maxIdx) }
                     OutlinedButton(onClick = { idx = maxIdx }) { Text("结尾") }
-                    OutlinedButton(onClick = { playing = !playing }) {
+                    OutlinedButton(onClick = {
+                        // A manual play/pause is a plain autoplay,
+                        // never a leftover mistake replay.
+                        replayStopAt = null
+                        playing = !playing
+                    }) {
                         Text(if (playing) "暂停播放" else "自动播放")
                     }
                 }
@@ -635,6 +650,92 @@ fun ReviewScreen(
                         text = batchNote!!,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                }
+                // Mistake replay (1.30.0): the marked moves from
+                // the whole-game analysis as one-tap jumps, worst
+                // first, plus a replay of the biggest blunder
+                // that starts one move earlier and stops one
+                // move after it.
+                val markedEntries = remember(liveRecord.marks, liveRecord.evals) {
+                    if (liveRecord.marks.isEmpty()) emptyList()
+                    else EvalUtil.markedMoves(
+                        liveRecord.marks, liveRecord.evals, snapshots[0].second
+                    )
+                }
+                if (markedEntries.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor =
+                                MaterialTheme.colorScheme.surfaceContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "失误手回放（点任意一手跳过去看）",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            FlowRow(
+                                horizontalArrangement =
+                                    Arrangement.spacedBy(8.dp),
+                                verticalArrangement =
+                                    Arrangement.spacedBy(8.dp)
+                            ) {
+                                for (entry in markedEntries.take(10)) {
+                                    val moveText =
+                                        notations.getOrNull(entry.moveNo - 1)
+                                            ?: "第 ${entry.moveNo} 手"
+                                    OutlinedButton(onClick = {
+                                        playing = false
+                                        replayStopAt = null
+                                        idx = entry.moveNo.coerceAtMost(maxIdx)
+                                        scope.launch {
+                                            pageScroll.animateScrollTo(0)
+                                        }
+                                    }) {
+                                        Text(
+                                            "第 ${entry.moveNo} 手 $moveText " +
+                                                entry.mark +
+                                                (entry.lossCp?.let {
+                                                    " · 掉约 " +
+                                                        String.format(
+                                                            "%.1f", it / 100.0
+                                                        ) + " 兵"
+                                                } ?: "")
+                                        )
+                                    }
+                                }
+                            }
+                            val worst = markedEntries.first()
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    idx = (worst.moveNo - 1).coerceAtLeast(0)
+                                    replayStopAt =
+                                        (worst.moveNo + 1).coerceAtMost(maxIdx)
+                                    playing = true
+                                    scope.launch {
+                                        pageScroll.animateScrollTo(0)
+                                    }
+                                },
+                                enabled = !batchRunning && !deepBusy
+                            ) {
+                                Text(
+                                    "回放最大失误（第 ${worst.moveNo} 手 " +
+                                        worst.mark + "）"
+                                )
+                            }
+                            Text(
+                                text = "回放从失误的前一手开始播，播到失误的后一手停下。" +
+                                    "跳过去之后，还可以对那一步用「深度分析这一步」看引擎的一选。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

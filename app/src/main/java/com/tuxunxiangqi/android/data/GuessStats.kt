@@ -41,7 +41,7 @@ fun parseGuessStats(text: String): Map<String, GuessStat>? {
 }
 
 /** Persistent guess-the-best-move statistics, bucketed by the
- *  trainer's source labels （简单/普通/困难/我的棋谱/错题本）.
+ *  trainer's source labels （简单/普通/困难/开局/我的棋谱/错题本）.
  *  Timed-mode questions are accounted separately under
  *  [TIMED_BUCKET] (since 1.8.0), so the per-source numbers stay
  *  untimed-only and the timed record stands on its own line.
@@ -104,7 +104,7 @@ class GuessStatsStore(context: Context) {
     }
 
     companion object {
-        val BUCKETS: List<String> = listOf("简单", "普通", "困难", "我的棋谱", "错题本")
+        val BUCKETS: List<String> = listOf("简单", "普通", "困难", "开局", "我的棋谱", "错题本")
 
         /** Bucket for questions answered under the 30-second
          *  timed mode; kept out of [BUCKETS] on purpose so the

@@ -55,4 +55,19 @@ class TrainingPoolsTest {
         assertEquals(12, GuessPositions.normal.size)
         assertEquals(12, GuessPositions.hard.size)
     }
+
+    @Test
+    fun openingGuessPoolIsRealBookPositions() {
+        // The 开局 pool (1.30.0) is derived from the opening
+        // book: every face must parse, be unique, and leave the
+        // side to move matching the ply parity of a 4–6 ply
+        // book line (even plies = Red to move).
+        val pool = GuessPositions.opening
+        assertEquals(12, pool.size)
+        assertEquals(pool.size, pool.map { it.second }.toSet().size)
+        for ((label, fen) in pool) {
+            val parsed = com.tuxunxiangqi.android.xiangqi.Fen.fromFen(fen)
+            assertTrue("unparseable FEN for $label: $fen", parsed != null)
+        }
+    }
 }

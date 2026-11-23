@@ -68,6 +68,31 @@ object EvalUtil {
         return out
     }
 
+    /** One marked move from a whole-game analysis, with the
+     *  score it gave away (mover's perspective, centipawns;
+     *  null when the neighbouring measurements are missing). */
+    data class MarkedMove(val moveNo: Int, val mark: String, val lossCp: Int?)
+
+    /** The marked moves of a game as a replay list (1.30.0):
+     *  blunders ("??") first, then questionables ("?"), each
+     *  group ordered by how much score was given away (biggest
+     *  first, unmeasured last), ties by move number. Drives the
+     *  review page's one-tap mistake replay. */
+    fun markedMoves(
+        marks: Map<Int, String>,
+        evals: Map<Int, Int>,
+        initialTurn: Side
+    ): List<MarkedMove> =
+        marks.entries
+            .map { (moveNo, mark) ->
+                MarkedMove(moveNo, mark, moveLossCp(evals, initialTurn, moveNo))
+            }
+            .sortedWith(
+                compareBy<MarkedMove> { if (it.mark == "??") 0 else 1 }
+                    .thenByDescending { it.lossCp ?: Int.MIN_VALUE }
+                    .thenBy { it.moveNo }
+            )
+
     /** 1-based rank of [uci] in a candidate list given as UCI
      *  moves in rank order, or null when the move is not there. */
     fun rankOfMove(candidateUcis: List<String>, uci: String): Int? {

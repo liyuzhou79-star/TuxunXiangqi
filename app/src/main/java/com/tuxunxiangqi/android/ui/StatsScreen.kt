@@ -211,11 +211,11 @@ fun StatsScreen(onBack: () -> Unit) {
                         "%）· 进前四 " + guessTotal.top4 + " 次",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                for (bucket in listOf("简单", "普通", "困难")) {
+                for (bucket in GuessStatsStore.BUCKETS) {
                     val s = guessStats.stat(bucket)
                     if (s.asked > 0) {
                         Text(
-                            text = "$bucket 档：答 " + s.asked + " 题，命中一选 " + s.bestHits +
+                            text = "$bucket：答 " + s.asked + " 题，命中一选 " + s.bestHits +
                                 " 次（" + s.bestRatePercent + "%）",
                             style = MaterialTheme.typography.bodyMedium
                         )

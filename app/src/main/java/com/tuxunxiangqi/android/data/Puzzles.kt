@@ -1,6 +1,9 @@
 package com.tuxunxiangqi.android.data
 
 import android.content.Context
+import com.tuxunxiangqi.android.xiangqi.Fen
+import com.tuxunxiangqi.android.xiangqi.GameState
+import com.tuxunxiangqi.android.xiangqi.OpeningBook
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -329,6 +332,40 @@ object GuessPositions {
         "双马炮对士象全" to "2bakab2/9/2N3N2/9/9/9/4C4/9/9/4K4 w - - 0 1",
         "车马对马士象" to "2bakab2/9/7R1/3n5/4N4/9/9/9/9/4K4 w - - 0 1"
     )
+
+    /** Opening-book positions (1.30.0): book lines replayed
+     *  4–6 plies from the standard start, so the side to move
+     *  faces a real 定式 position instead of an endgame face.
+     *  Derived from OpeningBook itself, so the pool can never
+     *  drift from the book the app ships; legality is replayed
+     *  through the real state machine and duplicates (the same
+     *  position reached by two lines) are dropped. Pinned by
+     *  TrainingPoolsTest. */
+    val opening: List<Pair<String, String>> by lazy {
+        val seen = HashSet<String>()
+        val out = ArrayList<Pair<String, String>>()
+        for (node in OpeningBook.allNodes()) {
+            val plies = node.historyUci.size
+            if (plies !in 4..6) continue
+            val gs = GameState()
+            var ok = true
+            for (uci in node.historyUci) {
+                val ft = Fen.parseUciMove(uci)
+                if (ft == null || !gs.tryMove(ft.first, ft.second)) {
+                    ok = false
+                    break
+                }
+            }
+            if (!ok) continue
+            val fen = Fen.toFen(gs)
+            if (!seen.add(fen)) continue
+            val notes = OpeningBook.historyNotation(node.historyUci)
+            val label = "定式走了 " + plies + " 手 · " +
+                notes.takeLast(2).joinToString(" ")
+            out.add(label to fen)
+        }
+        out
+    }
 }
 
 /** One wrong-book entry: a position the user guessed wrong on,
