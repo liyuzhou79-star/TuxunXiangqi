@@ -211,7 +211,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("音效", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Text(
-                        text = "落子、吃子、将军、胜负都有短音效，全部由程序现场合成，不占素材文件。关掉就全 App 静音。",
+                        text = "落子、吃子、胜负用的是真实录音（来自开源象棋项目 ChessRoad，GPL-3.0）；将军提示是程序合成的双响音。关掉就全 App 静音。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -301,6 +301,14 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(10.dp))
             TextButton(onClick = { clearOpen = true }) { Text("清空全部棋谱") }
+        }
+
+        SettingsCard(title = "资源与鸣谢") {
+            Text(
+                text = "棋子书法字：莫大毛筆體 Bakudai（SIL OFL 1.1 开源字体）；棋盘木纹照片：Cyril5555 摄，Wikimedia Commons（CC BY-SA 3.0）；落子、吃子、胜负音效：开源象棋项目 ChessRoad（GPL-3.0）；引擎：Pikafish（GPL-3.0）。完整出处与许可见仓库 THIRD_PARTY_NOTICES.md。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         SettingsCard(title = "检查更新") {
