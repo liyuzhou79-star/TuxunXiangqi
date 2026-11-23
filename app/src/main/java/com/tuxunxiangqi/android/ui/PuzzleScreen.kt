@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tuxunxiangqi.android.data.Puzzle
 import com.tuxunxiangqi.android.data.Puzzles
+import com.tuxunxiangqi.android.data.SettingsStore
 import com.tuxunxiangqi.android.data.dailyStreak
 import com.tuxunxiangqi.android.engine.PikafishEngine
 import com.tuxunxiangqi.android.engine.SoundFx
@@ -638,6 +639,19 @@ private fun PuzzlePlay(
         }
     }
 
+    // Safety judgements for the selected piece, wired exactly
+    // like the game screen (1.38.1): this screen once shipped
+    // without them, so every target fell back to the board's
+    // plain marker — which then borrowed the red ink colour
+    // and read as "every move is suicidal", and captures never
+    // showed their safe green ring. Same settings toggle, same
+    // shared Rules.safetyMap entry point.
+    val settingsStore = remember { SettingsStore(context) }
+    val safetyHintsOn = remember { settingsStore.safetyHintsOn }
+    val targetSafety = remember(selected, gs.lastMove, gs.moveCount, safetyHintsOn) {
+        Rules.safetyMap(safetyHintsOn, gs.cells, selected)
+    }
+
     fun onTap(pos: Pos) {
         if (busy || demoOn || gs.result != null || gs.turn != Side.RED) return
         val piece = gs.cells[pos.row * 9 + pos.col]
@@ -674,6 +688,7 @@ private fun PuzzlePlay(
                 selected = selected,
                 legalTargets = targets,
                 hint = hintMove,
+                targetSafety = targetSafety,
                 onTap = { onTap(it) }
             )
         }

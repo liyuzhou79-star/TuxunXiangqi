@@ -420,11 +420,7 @@ fun BoardScreen(
     // would be felt). Cost is pinned by TargetSafetyTest.
     val safetyHintsOn = remember { settingsStore.safetyHintsOn }
     val targetSafety = remember(selected, state.lastMove, state.moveCount, safetyHintsOn) {
-        if (safetyHintsOn && selected != null) {
-            Rules.targetSafeties(state.cells, selected!!)
-        } else {
-            emptyMap()
-        }
+        Rules.safetyMap(safetyHintsOn, state.cells, selected)
     }
     val extraHints = candidates
         .filter { it.rank != selectedRank }

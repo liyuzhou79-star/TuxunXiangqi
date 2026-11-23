@@ -87,6 +87,82 @@ class TargetSafetyTest {
     }
 
     @Test
+    fun cannonRecaptureThroughAScreenIsUnsafe() {
+        // Red cannon takes the black soldier on (4,3) using the
+        // black soldier on (4,5) as its screen. Behind the taken
+        // soldier, a black cannon on (4,0) fires back through
+        // the black soldier on (4,1): exactly one screen, so
+        // the capture is answered — 吃完被反吃.
+        val withScreen = cellsOf(
+            Triple(3, 0, Piece(PieceType.GENERAL, Side.BLACK)),
+            Triple(5, 9, Piece(PieceType.GENERAL, Side.RED)),
+            Triple(4, 7, Piece(PieceType.CANNON, Side.RED)),
+            Triple(4, 5, Piece(PieceType.SOLDIER, Side.BLACK)),
+            Triple(4, 3, Piece(PieceType.SOLDIER, Side.BLACK)),
+            Triple(4, 1, Piece(PieceType.SOLDIER, Side.BLACK)),
+            Triple(4, 0, Piece(PieceType.CANNON, Side.BLACK))
+        )
+        assertEquals(
+            TargetSafety.UNSAFE,
+            Rules.targetSafety(withScreen, Pos(4, 7), Pos(4, 3))
+        )
+        // Remove the screening soldier and the same capture is
+        // safe: a cannon with no screen cannot strike back.
+        val noScreen = cellsOf(
+            Triple(3, 0, Piece(PieceType.GENERAL, Side.BLACK)),
+            Triple(5, 9, Piece(PieceType.GENERAL, Side.RED)),
+            Triple(4, 7, Piece(PieceType.CANNON, Side.RED)),
+            Triple(4, 5, Piece(PieceType.SOLDIER, Side.BLACK)),
+            Triple(4, 3, Piece(PieceType.SOLDIER, Side.BLACK)),
+            Triple(4, 0, Piece(PieceType.CANNON, Side.BLACK))
+        )
+        assertEquals(
+            TargetSafety.SAFE,
+            Rules.targetSafety(noScreen, Pos(4, 7), Pos(4, 3))
+        )
+    }
+
+    @Test
+    fun soldierAttacksForwardAlwaysAndSidewaysOnlyAcrossTheRiver() {
+        // Forward: the black soldier on (1,3) covers (1,4)
+        // straight ahead — driving the chariot there is suicide.
+        val forward = cellsOf(
+            Triple(3, 0, Piece(PieceType.GENERAL, Side.BLACK)),
+            Triple(5, 9, Piece(PieceType.GENERAL, Side.RED)),
+            Triple(2, 4, Piece(PieceType.CHARIOT, Side.RED)),
+            Triple(1, 3, Piece(PieceType.SOLDIER, Side.BLACK))
+        )
+        assertEquals(
+            TargetSafety.UNSAFE,
+            Rules.targetSafety(forward, Pos(2, 4), Pos(1, 4))
+        )
+        // Sideways before crossing: the black soldier on (0,4)
+        // has not crossed the river, so (1,4) beside it is safe.
+        val uncrossed = cellsOf(
+            Triple(3, 0, Piece(PieceType.GENERAL, Side.BLACK)),
+            Triple(5, 9, Piece(PieceType.GENERAL, Side.RED)),
+            Triple(2, 4, Piece(PieceType.CHARIOT, Side.RED)),
+            Triple(0, 4, Piece(PieceType.SOLDIER, Side.BLACK))
+        )
+        assertEquals(
+            TargetSafety.SAFE,
+            Rules.targetSafety(uncrossed, Pos(2, 4), Pos(1, 4))
+        )
+        // Sideways after crossing: the black soldier on (0,5)
+        // covers (1,5) beside it — the same step is suicide.
+        val crossed = cellsOf(
+            Triple(3, 0, Piece(PieceType.GENERAL, Side.BLACK)),
+            Triple(5, 9, Piece(PieceType.GENERAL, Side.RED)),
+            Triple(2, 5, Piece(PieceType.CHARIOT, Side.RED)),
+            Triple(0, 5, Piece(PieceType.SOLDIER, Side.BLACK))
+        )
+        assertEquals(
+            TargetSafety.UNSAFE,
+            Rules.targetSafety(crossed, Pos(2, 5), Pos(1, 5))
+        )
+    }
+
+    @Test
     fun safetiesCoverExactlyTheLegalTargets() {
         val cells = openFilePosition()
         val safeties = Rules.targetSafeties(cells, Pos(0, 9))

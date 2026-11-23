@@ -55,6 +55,14 @@ data class Move(val from: Pos, val to: Pos, val captured: Piece?)
  *  right back （被反吃）. */
 enum class TargetSafety { SAFE, UNSAFE }
 
+/** The marker drawn on one legal target square: decided purely
+ *  by [Rules.markerFor], rendered by the board. PLAIN markers
+ *  mean "no judgement" (hints off, or a screen that must not
+ *  judge) and are deliberately colourless — they must never
+ *  borrow the danger red, or every unjudged target reads as
+ *  suicidal. */
+enum class SafetyMarker { SAFE_DOT, DANGER_DOT, PLAIN_DOT, SAFE_RING, PLAIN_RING, NO_MARKER }
+
 /** Outcome of a finished game: [winner] (null for a draw) plus a
  *  plain reason string ("将死" checkmate / "困毙" stalemate — in
  *  xiangqi the side that cannot move loses either way). */
@@ -263,6 +271,43 @@ object Rules {
         }
         return out
     }
+
+    /** The safety map a play screen hands the board for the
+     *  current selection: full judgements when the hints are
+     *  enabled and a piece is selected, empty otherwise (the
+     *  board then draws plain, unjudged markers). This is the
+     *  ONE wiring every play screen must use — the puzzle
+     *  screen once shipped without it, so every target there
+     *  fell back to the plain marker and read as "everything
+     *  is red", and no capture ever got its green ring
+     *  (fixed in 1.38.1). */
+    fun safetyMap(
+        enabled: Boolean,
+        cells: List<Piece?>,
+        selected: Pos?
+    ): Map<Pos, TargetSafety> =
+        if (enabled && selected != null) {
+            targetSafeties(cells, selected)
+        } else {
+            emptyMap()
+        }
+
+    /** Which marker one legal target gets, per the user's
+     *  spec: a safe quiet move is a green dot, a suicidal one
+     *  a red dot （送死）; a capture that cannot be answered
+     *  gets a green ring, and a capture that would be
+     *  recaptured （吃完被反吃） gets NO marker at all. A null
+     *  judgement (hints off / screen must not judge) yields a
+     *  plain marker, never a coloured one. */
+    fun markerFor(capture: Boolean, safety: TargetSafety?): SafetyMarker =
+        when {
+            !capture && safety == TargetSafety.SAFE -> SafetyMarker.SAFE_DOT
+            !capture && safety == TargetSafety.UNSAFE -> SafetyMarker.DANGER_DOT
+            !capture -> SafetyMarker.PLAIN_DOT
+            safety == TargetSafety.SAFE -> SafetyMarker.SAFE_RING
+            safety == TargetSafety.UNSAFE -> SafetyMarker.NO_MARKER
+            else -> SafetyMarker.PLAIN_RING
+        }
 
     fun allLegalMoves(cells: List<Piece?>, side: Side): List<Move> {
         val out = ArrayList<Move>()

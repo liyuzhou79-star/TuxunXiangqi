@@ -55,6 +55,7 @@ import com.tuxunxiangqi.android.xiangqi.PieceType
 import com.tuxunxiangqi.android.xiangqi.Pos
 import com.tuxunxiangqi.android.xiangqi.Rules
 import com.tuxunxiangqi.android.xiangqi.Side
+import com.tuxunxiangqi.android.xiangqi.SafetyMarker
 import com.tuxunxiangqi.android.xiangqi.TargetSafety
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -292,60 +293,40 @@ fun XiangqiBoard(
             drawGlowDot(point(mv.from), cell)
             drawGlowHalo(point(mv.to), cell, moveProgress.value)
         }
-        // Legal-target hints for the selected piece. When safety
-        // judgements are supplied they drive the colours (user
-        // spec): a quiet square is a green dot when the piece
-        // survives there and a red dot when it would be taken
-        // （送死）; a capture gets a green ring when it cannot be
-        // answered and NO marker at all when it would be
-        // recaptured （吃完被反吃）. Without judgements (safety
-        // hints off) the plain pre-1.2 markers are drawn.
+        // Legal-target hints for the selected piece. The
+        // classification -> marker mapping lives in ONE place,
+        // Rules.markerFor (user spec): a quiet square is a green
+        // dot when the piece survives there and a red dot when
+        // it would be taken （送死）; a capture gets a green ring
+        // when it cannot be answered and NO marker at all when
+        // it would be recaptured （吃完被反吃）. Without a
+        // judgement (hints off, or a screen that must not judge)
+        // the marker is PLAIN ink — never red, or every unjudged
+        // target reads as danger (the 1.38.1 audit found exactly
+        // that: the old plain marker borrowed RedInk).
+        // Quiet dots are drawn now, on empty squares nothing can
+        // cover them. Capture rings are only COLLECTED here and
+        // drawn after the pieces (see below): a ring drawn under
+        // a baked piece face is swallowed by the face and its
+        // side wall, which is how the green ring vanished in
+        // 1.26.0.
+        val captureMarkers = ArrayList<Pair<Offset, SafetyMarker>>()
         for (t in legalTargets) {
-            val c = point(t)
-            val safety = targetSafety[t]
-            if (state.pieceAt(t) == null) {
-                when (safety) {
-                    TargetSafety.SAFE -> drawSafetyDot(c, cell, SafeGreen)
-                    TargetSafety.UNSAFE -> drawSafetyDot(c, cell, DangerRed)
-                    null -> drawCircle(
-                        color = RedInk.copy(alpha = 0.45f),
-                        radius = cell * 0.11f,
-                        center = c
-                    )
-                }
-            } else {
-                when (safety) {
-                    TargetSafety.SAFE -> {
-                        drawCircle(
-                            color = SafeGreen.copy(alpha = 0.16f),
-                            radius = cell * 0.46f,
-                            center = c
-                        )
-                        drawCircle(
-                            color = SafeGreen,
-                            radius = cell * 0.46f,
-                            center = c,
-                            style = Stroke(width = cell * 0.05f)
-                        )
-                    }
-                    TargetSafety.UNSAFE -> {
-                        // Deliberately nothing: a capture that gets
-                        // recaptured carries no colour at all.
-                    }
-                    null -> {
-                        drawCircle(
-                            color = RedInk.copy(alpha = 0.16f),
-                            radius = cell * 0.46f,
-                            center = c
-                        )
-                        drawCircle(
-                            color = RedInk,
-                            radius = cell * 0.46f,
-                            center = c,
-                            style = Stroke(width = cell * 0.045f)
-                        )
-                    }
-                }
+            val marker = Rules.markerFor(
+                state.pieceAt(t) != null,
+                targetSafety[t]
+            )
+            when (marker) {
+                SafetyMarker.SAFE_DOT ->
+                    drawSafetyDot(point(t), cell, SafeGreen)
+                SafetyMarker.DANGER_DOT ->
+                    drawSafetyDot(point(t), cell, DangerRed)
+                SafetyMarker.PLAIN_DOT -> drawCircle(
+                    color = GridInk.copy(alpha = 0.50f),
+                    radius = cell * 0.11f,
+                    center = point(t)
+                )
+                else -> captureMarkers.add(point(t) to marker)
             }
         }
         // Pieces. While the move animation runs, the moved piece
@@ -375,6 +356,43 @@ fun XiangqiBoard(
                     moving, selected = false, liftShadow = lift,
                     baked = pieceBitmaps[moving.type to moving.side]
                 )
+            }
+        }
+        // Capture rings, ABOVE the pieces (1.38.1): the ring
+        // hugs the target piece, so it must paint over the
+        // baked face, its side wall and the ground shadow —
+        // all three are drawn with the piece and used to bury
+        // the ring's lower arc. NO_MARKER (a capture that gets
+        // recaptured) deliberately draws nothing.
+        for ((c, marker) in captureMarkers) {
+            when (marker) {
+                SafetyMarker.SAFE_RING -> {
+                    drawCircle(
+                        color = SafeGreen.copy(alpha = 0.16f),
+                        radius = cell * 0.46f,
+                        center = c
+                    )
+                    drawCircle(
+                        color = SafeGreen,
+                        radius = cell * 0.46f,
+                        center = c,
+                        style = Stroke(width = cell * 0.05f)
+                    )
+                }
+                SafetyMarker.PLAIN_RING -> {
+                    drawCircle(
+                        color = GridInk.copy(alpha = 0.18f),
+                        radius = cell * 0.46f,
+                        center = c
+                    )
+                    drawCircle(
+                        color = GridInk.copy(alpha = 0.85f),
+                        radius = cell * 0.46f,
+                        center = c,
+                        style = Stroke(width = cell * 0.045f)
+                    )
+                }
+                else -> Unit
             }
         }
         // The bright rim of the destination glow, above the piece
