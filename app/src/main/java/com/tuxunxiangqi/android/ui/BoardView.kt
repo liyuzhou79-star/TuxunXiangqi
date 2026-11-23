@@ -87,6 +87,48 @@ val PieceFontFamily = FontFamily(Font(R.font.bakudai_bold, FontWeight.Bold))
 
 /** The bundled walnut-grain photo (CC BY-SA 3.0; see
  *  THIRD_PARTY_NOTICES.md), decoded once and remembered. */
+/** The baked piece faces (1.26.0): real grain, wall, engraved
+ *  rings and the calligraphy glyph baked into WebP assets by
+ *  hidden/bake_pieces.py — see THIRD_PARTY_NOTICES.md. Decoded
+ *  off the main thread; until they are ready (and if decoding
+ *  ever failed) the procedural drawer below is the fallback,
+ *  so the board never sits empty. */
+@Composable
+private fun rememberPieceBitmaps(): Map<Pair<PieceType, Side>, ImageBitmap> {
+    val context = LocalContext.current
+    val state = androidx.compose.runtime.produceState(
+        initialValue = emptyMap<Pair<PieceType, Side>, ImageBitmap>()
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val wanted = listOf(
+                Triple(PieceType.GENERAL, Side.RED, R.drawable.piece_red_general),
+                Triple(PieceType.ADVISOR, Side.RED, R.drawable.piece_red_advisor),
+                Triple(PieceType.ELEPHANT, Side.RED, R.drawable.piece_red_elephant),
+                Triple(PieceType.HORSE, Side.RED, R.drawable.piece_red_horse),
+                Triple(PieceType.CHARIOT, Side.RED, R.drawable.piece_red_chariot),
+                Triple(PieceType.CANNON, Side.RED, R.drawable.piece_red_cannon),
+                Triple(PieceType.SOLDIER, Side.RED, R.drawable.piece_red_soldier),
+                Triple(PieceType.GENERAL, Side.BLACK, R.drawable.piece_black_general),
+                Triple(PieceType.ADVISOR, Side.BLACK, R.drawable.piece_black_advisor),
+                Triple(PieceType.ELEPHANT, Side.BLACK, R.drawable.piece_black_elephant),
+                Triple(PieceType.HORSE, Side.BLACK, R.drawable.piece_black_horse),
+                Triple(PieceType.CHARIOT, Side.BLACK, R.drawable.piece_black_chariot),
+                Triple(PieceType.CANNON, Side.BLACK, R.drawable.piece_black_cannon),
+                Triple(PieceType.SOLDIER, Side.BLACK, R.drawable.piece_black_soldier)
+            )
+            val out = mutableMapOf<Pair<PieceType, Side>, ImageBitmap>()
+            for ((type, side, res) in wanted) {
+                runCatching {
+                    android.graphics.BitmapFactory.decodeResource(context.resources, res)
+                        ?.asImageBitmap()?.let { out[type to side] = it }
+                }
+            }
+            out
+        }
+    }
+    return state.value
+}
+
 @Composable
 private fun rememberWoodBitmap(): ImageBitmap {
     val context = LocalContext.current
@@ -161,6 +203,7 @@ fun XiangqiBoard(
 ) {
     val measurer = rememberTextMeasurer()
     val wood = rememberWoodBitmap()
+    val pieceBitmaps = rememberPieceBitmaps()
     // The tap handler must always be the caller's LATEST lambda:
     // pointerInput only restarts when its keys change, so a
     // handler captured at first composition would keep reading
@@ -312,7 +355,7 @@ fun XiangqiBoard(
                 val pos = Pos(c, r)
                 val piece = state.pieceAt(pos) ?: continue
                 if (animating && mvNow != null && pos == mvNow.to) continue
-                drawPiece(measurer, point(pos), cell * 0.44f, piece, pos == selected)
+                drawPiece(measurer, point(pos), cell * 0.44f, piece, pos == selected, pieceBitmaps[piece.type to piece.side])
             }
         }
         if (animating && mvNow != null) {
@@ -328,7 +371,8 @@ fun XiangqiBoard(
                 val lift = kotlin.math.sin(p * Math.PI.toFloat()).toFloat()
                 drawPiece(
                     measurer, at, cell * 0.44f * (1f + 0.10f * lift),
-                    moving, selected = false, liftShadow = lift
+                    moving, selected = false, liftShadow = lift,
+                    baked = pieceBitmaps[moving.type to moving.side]
                 )
             }
         }
@@ -514,6 +558,15 @@ private fun DrawScope.drawWoodFace(
             style = Stroke(width = cell * (0.03f + rnd.nextFloat() * 0.05f))
         )
     }
+    // River band: the strip between the two halves carries a
+    // whisper of extra warmth so the two territories separate
+    // at a glance (1.26.0).
+    val margin = (totalH - 9f) / 2f
+    drawRect(
+        color = Color(0xFFFFE9BE).copy(alpha = 0.055f),
+        topLeft = Offset(0f, (margin + 4f) * cell),
+        size = androidx.compose.ui.geometry.Size(size.width, cell)
+    )
     // Vignette: edges fall off into shade so the face feels like
     // a lit wooden surface rather than a flat sheet.
     drawRect(
@@ -531,6 +584,35 @@ private fun DrawScope.drawWoodFace(
     drawRect(
         color = GridInk.copy(alpha = 0.55f),
         style = Stroke(width = 1.5f)
+    )
+    // Inner bevel of the board slab (1.26.0): a light catch on
+    // the top and left inner edges, shade on the bottom and
+    // right, so the face reads as a board with thickness
+    // instead of a printed sheet.
+    val inset = 2.5f
+    drawLine(
+        color = Color.White.copy(alpha = 0.15f),
+        start = Offset(inset, inset),
+        end = Offset(size.width - inset, inset),
+        strokeWidth = 2.5f
+    )
+    drawLine(
+        color = Color.White.copy(alpha = 0.15f),
+        start = Offset(inset, inset),
+        end = Offset(inset, size.height - inset),
+        strokeWidth = 2.5f
+    )
+    drawLine(
+        color = Color(0xFF2A1808).copy(alpha = 0.18f),
+        start = Offset(inset, size.height - inset),
+        end = Offset(size.width - inset, size.height - inset),
+        strokeWidth = 2.5f
+    )
+    drawLine(
+        color = Color(0xFF2A1808).copy(alpha = 0.18f),
+        start = Offset(size.width - inset, inset),
+        end = Offset(size.width - inset, size.height - inset),
+        strokeWidth = 2.5f
     )
 }
 
@@ -680,17 +762,51 @@ private fun DrawScope.drawPiece(
     r: Float,
     piece: Piece,
     selected: Boolean,
-    liftShadow: Float = 0f
+    liftShadow: Float = 0f,
+    baked: ImageBitmap? = null
 ) {
     val ink = if (piece.side == Side.RED) RedInk else BlackInk
     // Ground shadow: an ellipse squashed toward the light, growing
     // softer and larger while the piece is lifted mid-move.
+    // Always drawn live (never baked) so the lift animation and
+    // the shadow stay in step.
     val shadowOff = Offset(r * 0.10f, r * (0.16f + 0.22f * liftShadow))
     drawOval(
         color = Color.Black.copy(alpha = 0.26f - 0.08f * liftShadow),
         topLeft = center + shadowOff - Offset(r * 1.02f, r * 0.94f),
         size = androidx.compose.ui.geometry.Size(r * 2.04f, r * 1.88f)
     )
+    // Baked face (1.26.0): the asset's face centre sits at
+    // (0.50, 0.46) of its side and its face radius is 0.385 of
+    // the side — the same numbers bake_pieces.py used.
+    if (baked != null) {
+        val sidePx = r / 0.385f
+        drawImage(
+            image = baked,
+            dstTopLeft = androidx.compose.ui.unit.IntOffset(
+                (center.x - 0.50f * sidePx).toInt(),
+                (center.y - 0.46f * sidePx).toInt()
+            ),
+            dstSize = androidx.compose.ui.unit.IntSize(
+                sidePx.toInt(), sidePx.toInt()
+            )
+        )
+        if (selected) {
+            drawCircle(
+                color = RedInk.copy(alpha = 0.30f),
+                radius = r + r * 0.30f,
+                center = center,
+                style = Stroke(width = r * 0.16f)
+            )
+            drawCircle(
+                color = RedInk,
+                radius = r + r * 0.13f,
+                center = center,
+                style = Stroke(width = r * 0.07f)
+            )
+        }
+        return
+    }
     // Side wall: the extruded rim of the disc, visible below the
     // top face — this is what gives the piece real thickness.
     drawCircle(

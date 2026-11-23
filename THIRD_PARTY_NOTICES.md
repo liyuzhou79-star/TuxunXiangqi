@@ -80,3 +80,18 @@ and its spectrum shows the irregular harmonic / formant
 structure of a real shouted voice — unlike the flat synthesized
 tones rejected in earlier searches. It was loudness-normalised
 and re-encoded, with no change to the voice itself.
+
+## Baked piece faces (in-house assets)
+
+The fourteen piece-face images (`piece_red_*.webp` /
+`piece_black_*.webp` in `res/drawable-nodpi`) were produced
+in-house by an offline baking script; no third-party artwork
+is included. Each face composites materials already listed
+above: the CC BY-SA 3.0 walnut photograph (brightened and
+re-toned toward boxwood, rotated per piece) for the grain,
+and the Bakudai Bold calligraphy typeface (OFL) for the
+glyph. The side wall, engraved rings, bevel light and glyph
+emboss are drawn by the script itself. At runtime the app
+only pastes the baked image and draws one live shadow, so
+the pieces keep a finished-art look without per-frame
+procedural drawing.
