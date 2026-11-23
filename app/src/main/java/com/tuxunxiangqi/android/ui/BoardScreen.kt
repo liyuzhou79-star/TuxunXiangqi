@@ -286,7 +286,7 @@ fun BoardScreen(
     LaunchedEffect(state.result) {
         val res = state.result ?: return@LaunchedEffect
         when {
-            res.winner == null -> SoundFx.play(context, SoundKind.GOOD)
+            res.winner == null -> SoundFx.play(context, SoundKind.DRAW)
             mode == BoardMode.AI ->
                 SoundFx.play(
                     context,

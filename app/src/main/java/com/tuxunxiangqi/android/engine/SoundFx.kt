@@ -4,6 +4,8 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
+import com.tuxunxiangqi.android.R
 import com.tuxunxiangqi.android.data.SettingsStore
 import kotlin.concurrent.thread
 import kotlin.math.PI
@@ -11,21 +13,70 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.random.Random
 
-enum class SoundKind { MOVE, CAPTURE, CHECK, WIN, LOSE, GOOD, BAD }
+enum class SoundKind { MOVE, CAPTURE, CHECK, WIN, LOSE, DRAW, GOOD, BAD }
 
-/** Sound effects synthesized in code — no audio asset files at
- *  all. Each effect is a short PCM buffer rendered from sine
- *  tones and decaying noise (a wooden "knock" for moves), played
- *  through a throwaway AudioTrack on a daemon thread. Gated by
- *  the user's sound setting; every failure is swallowed so a
- *  sound problem can never break a game. */
+/** In-game sounds. Move, capture, win, lose and draw use real
+ *  recorded clips bundled in res/raw (from the open-source
+ *  ChessRoad project, GPL-3.0 — see THIRD_PARTY_NOTICES.md),
+ *  played through MediaPlayer. The remaining cues (check, and
+ *  the small guess-game ticks) fall back to the original
+ *  code-synthesized PCM tones, which also serve as the fallback
+ *  if a clip ever fails to play. Gated by the user's sound
+ *  setting; every failure is swallowed so a sound problem can
+ *  never break a game. */
 object SoundFx {
 
     private const val RATE = 44100
 
+    private fun rawFor(kind: SoundKind): Int? = when (kind) {
+        SoundKind.MOVE -> R.raw.snd_move
+        SoundKind.CAPTURE -> R.raw.snd_capture
+        SoundKind.WIN -> R.raw.snd_win
+        SoundKind.LOSE -> R.raw.snd_lose
+        SoundKind.DRAW -> R.raw.snd_draw
+        else -> null
+    }
+
     fun play(context: Context, kind: SoundKind) {
         try {
             if (!SettingsStore(context).soundOn) return
+            val raw = rawFor(kind)
+            if (raw != null && playRaw(context, raw)) return
+            playSynth(kind)
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Plays a bundled clip; returns false (so the caller falls
+     *  back to the synth tone) if anything goes wrong. */
+    private fun playRaw(context: Context, raw: Int): Boolean {
+        return try {
+            thread(isDaemon = true) {
+                var player: MediaPlayer? = null
+                try {
+                    player = MediaPlayer.create(context, raw)
+                    if (player == null) return@thread
+                    player.setOnCompletionListener { it.release() }
+                    player.setOnErrorListener { p, _, _ ->
+                        p.release()
+                        true
+                    }
+                    player.start()
+                } catch (_: Exception) {
+                    try {
+                        player?.release()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun playSynth(kind: SoundKind) {
+        try {
             val samples = render(kind)
             thread(isDaemon = true) {
                 var track: AudioTrack? = null
@@ -89,6 +140,10 @@ object SoundFx {
                 Seg(392.0, 140, vol = 0.5),
                 Seg(330.0, 140, vol = 0.5),
                 Seg(262.0, 220, vol = 0.5)
+            )
+            SoundKind.DRAW -> listOf(
+                Seg(523.0, 130, vol = 0.5),
+                Seg(523.0, 180, vol = 0.45)
             )
             SoundKind.GOOD -> listOf(
                 Seg(660.0, 100, vol = 0.5),
