@@ -75,6 +75,28 @@ class OpeningBookTest {
         assertTrue(OpeningBook.search("炮二平五").isNotEmpty())
     }
 
+    /** Turn parity (1.16.0, "start a game from this line"):
+     *  replaying any book history on the real state machine must
+     *  end on the side turnAfter predicts. */
+    @Test
+    fun turnAfterMatchesReplayedState() {
+        assertEquals(
+            com.tuxunxiangqi.android.xiangqi.Side.RED,
+            OpeningBook.turnAfter(emptyList())
+        )
+        for (node in OpeningBook.allNodes()) {
+            val gs = GameState()
+            for (uci in node.historyUci) {
+                val ft = Fen.parseUciMove(uci)!!
+                assertTrue(gs.tryMove(ft.first, ft.second))
+            }
+            assertEquals(
+                "turn mismatch after '${node.historyUci}'",
+                OpeningBook.turnAfter(node.historyUci), gs.turn
+            )
+        }
+    }
+
     /** Blank query is the whole book; nonsense finds nothing. */
     @Test
     fun searchBlankAndNonsense() {

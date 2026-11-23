@@ -189,6 +189,14 @@ object OpeningBook {
     fun historyNotation(historyUci: List<String>): List<String> =
         Notation.pvText(GameState().cells.toList(), historyUci, historyUci.size)
 
+    /** Whose turn it is after a move history from the standard
+     *  start: Red moves first and the sides alternate, so an
+     *  even-length history leaves Red to move. (Validated for
+     *  every book node against the real state machine by
+     *  OpeningBookTest.) */
+    fun turnAfter(historyUci: List<String>): Side =
+        if (historyUci.size % 2 == 0) Side.RED else Side.BLACK
+
     /** Book browsing search (1.15.0). A blank query returns the
      *  whole book. Otherwise a node matches when the query text
      *  appears in a suggestion's printed name (which carries the

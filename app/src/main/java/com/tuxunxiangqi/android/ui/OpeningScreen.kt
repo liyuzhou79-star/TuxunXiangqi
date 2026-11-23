@@ -39,7 +39,13 @@ import kotlinx.coroutines.launch
  *  as arrows. Read-only — studying never starts a game. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OpeningScreen(onBack: () -> Unit) {
+fun OpeningScreen(
+    onBack: () -> Unit,
+    /** Start a real game from the previewed position (1.16.0):
+     *  cells, whether Red is to move, and the game mode. */
+    onStartGame: (List<com.tuxunxiangqi.android.xiangqi.Piece?>, Boolean, BoardMode) -> Unit =
+        { _, _, _ -> }
+) {
     var query by remember { mutableStateOf("") }
     val allNodes = remember { OpeningBook.allNodes() }
     val totalSuggestions = remember { allNodes.sumOf { it.suggestions.size } }
@@ -106,6 +112,9 @@ fun OpeningScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(14.dp))
         Text(
             text = historyText +
+                "（" + (if (OpeningBook.turnAfter(selHistory) ==
+                    com.tuxunxiangqi.android.xiangqi.Side.RED
+                ) "红" else "黑") + "方走棋）" +
                 if (selName != null) "（建议：$selName）" else "",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold
@@ -131,6 +140,29 @@ fun OpeningScreen(onBack: () -> Unit) {
                     )
                 }
             }
+        }
+        Spacer(Modifier.height(12.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.Button(
+                onClick = {
+                    onStartGame(
+                        preview.cells.toList(),
+                        OpeningBook.turnAfter(selHistory) ==
+                            com.tuxunxiangqi.android.xiangqi.Side.RED,
+                        BoardMode.AI
+                    )
+                }
+            ) { Text("从这个局面人机对弈") }
+            OutlinedButton(
+                onClick = {
+                    onStartGame(
+                        preview.cells.toList(),
+                        OpeningBook.turnAfter(selHistory) ==
+                            com.tuxunxiangqi.android.xiangqi.Side.RED,
+                        BoardMode.PVP
+                    )
+                }
+            ) { Text("从这个局面人人对弈") }
         }
         Spacer(Modifier.height(16.dp))
         if (nodes.isEmpty()) {

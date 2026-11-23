@@ -267,6 +267,7 @@ fun BoardScreen(
     mode: BoardMode,
     onBack: () -> Unit,
     startCells: List<Piece?>? = null,
+    startTurn: Side = Side.RED,
     onReviewRecord: (Long) -> Unit = {},
     resume: ResumeGame? = null
 ) {
@@ -283,7 +284,7 @@ fun BoardScreen(
                     if (!tryMove(mv.first, mv.second)) break
                 }
             } else if (startCells != null) {
-                newGame(startCells, Side.RED)
+                newGame(startCells, startTurn)
             }
         }
     }
