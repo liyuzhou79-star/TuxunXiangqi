@@ -185,7 +185,7 @@ object OpeningBook {
         ),
         "g0e2 c9e7 b2b4 b9c7" to listOf(
             "h0g2" to "马二进三",
-            "h2e2" to "炮二平五",
+            "c3c4" to "兵七进一",
             "i0h0" to "车一平二",
         )
     )
