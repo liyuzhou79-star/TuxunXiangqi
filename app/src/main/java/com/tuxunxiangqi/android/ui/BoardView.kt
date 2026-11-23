@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -160,6 +161,14 @@ fun XiangqiBoard(
 ) {
     val measurer = rememberTextMeasurer()
     val wood = rememberWoodBitmap()
+    // The tap handler must always be the caller's LATEST lambda:
+    // pointerInput only restarts when its keys change, so a
+    // handler captured at first composition would keep reading
+    // the values of that composition forever (this froze the
+    // puzzle and guess screens' move gates at their initial
+    // empty target lists — pieces could be selected but never
+    // moved, fixed in 1.24.0).
+    val latestOnTap by rememberUpdatedState(onTap)
     // Board geometry in cell units: grid is 8 wide x 9 tall, with a
     // 0.62-cell margin so edge pieces never clip.
     val marginUnits = 0.62f
@@ -206,13 +215,13 @@ fun XiangqiBoard(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(totalW / totalH)
-            .pointerInput(state, flipped) {
+            .pointerInput(flipped) {
                 detectTapGestures { offset ->
                     val cell = size.width / totalW
                     val col = ((offset.x / cell) - marginUnits).roundToInt()
                     val row = ((offset.y / cell) - marginUnits).roundToInt()
                     val pos = disp(Pos(col, row))
-                    if (pos.inside()) onTap(pos)
+                    if (pos.inside()) latestOnTap(pos)
                 }
             }
     ) {

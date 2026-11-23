@@ -301,7 +301,10 @@ fun GuessScreen(onBack: () -> Unit) {
         val piece = gs.cells[pos.row * 9 + pos.col]
         val sel = selected
         when {
-            sel != null && pos in targets -> {
+            // Live legality at tap time, same reasoning as the
+            // puzzle screen: the precomputed list only drives
+            // the dots, never the submission gate (1.24.0).
+            sel != null && Rules.isLegal(gs.cells, sel, pos) -> {
                 selected = null
                 judge(sel to pos)
             }

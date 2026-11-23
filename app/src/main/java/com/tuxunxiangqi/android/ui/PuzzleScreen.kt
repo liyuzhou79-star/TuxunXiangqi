@@ -451,7 +451,12 @@ private fun PuzzlePlay(
         val piece = gs.cells[pos.row * 9 + pos.col]
         val sel = selected
         when {
-            sel != null && pos in targets -> {
+            // Legality is judged live at tap time, not against
+            // the precomputed display list: the list is for the
+            // dots, the move itself must never depend on a
+            // value captured by an earlier composition (the
+            // 1.24.0 frozen-gate bug).
+            sel != null && Rules.isLegal(gs.cells, sel, pos) -> {
                 if (gs.tryMove(sel, pos)) afterUserMove()
             }
             piece != null && piece.side == Side.RED -> selected = pos
