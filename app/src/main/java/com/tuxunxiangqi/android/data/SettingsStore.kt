@@ -27,11 +27,19 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("analysisMs", 2000)
         set(value) = prefs.edit().putInt("analysisMs", value).apply()
 
-    /** Sound effects are synthesized in code (no audio files);
-     *  on by default, this switch turns them off everywhere. */
+    /** Sound effects on/off, everywhere. On by default. */
     var soundOn: Boolean
         get() = prefs.getBoolean("soundOn", true)
         set(value) = prefs.edit().putBoolean("soundOn", value).apply()
+
+    /** Safety colours on the selected piece's legal targets:
+     *  green = the piece survives there, red = it would be taken
+     *  （送死）, green ring = a capture that cannot be answered,
+     *  no marker = a capture that would be recaptured. Judged by
+     *  the local rules layer only. On by default. */
+    var safetyHintsOn: Boolean
+        get() = prefs.getBoolean("safetyHintsOn", true)
+        set(value) = prefs.edit().putBoolean("safetyHintsOn", value).apply()
 
     fun toJson(): JSONObject {
         val o = JSONObject()
@@ -40,6 +48,7 @@ class SettingsStore(context: Context) {
         o.put("defaultClock", defaultClockMinutes)
         o.put("analysisMs", defaultAnalysisMs)
         o.put("soundOn", soundOn)
+        o.put("safetyHintsOn", safetyHintsOn)
         return o
     }
 
@@ -49,6 +58,9 @@ class SettingsStore(context: Context) {
         defaultClockMinutes = o.optInt("defaultClock", defaultClockMinutes)
         defaultAnalysisMs = o.optInt("analysisMs", defaultAnalysisMs)
         soundOn = o.optBoolean("soundOn", soundOn)
+        // Older backups have no safetyHintsOn key: keep the
+        // current value then (optBoolean falls back to it).
+        safetyHintsOn = o.optBoolean("safetyHintsOn", safetyHintsOn)
     }
 }
 

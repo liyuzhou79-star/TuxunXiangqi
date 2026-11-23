@@ -36,7 +36,24 @@ enum class PieceType(
 
 data class Piece(val type: PieceType, val side: Side)
 
+/** Display-only material points per piece type. */
+fun materialValue(type: PieceType): Int = when (type) {
+    PieceType.CHARIOT -> 600
+    PieceType.CANNON -> 285
+    PieceType.HORSE -> 270
+    PieceType.ELEPHANT -> 120
+    PieceType.ADVISOR -> 120
+    PieceType.SOLDIER -> 60
+    PieceType.GENERAL -> 0
+}
+
 data class Move(val from: Pos, val to: Pos, val captured: Piece?)
+
+/** Whether a moved piece survives on its destination square:
+ *  SAFE = no opposing piece attacks that square after the move;
+ *  UNSAFE = it would be taken （送死）, or, for a capture, taken
+ *  right back （被反吃）. */
+enum class TargetSafety { SAFE, UNSAFE }
 
 /** Outcome of a finished game: [winner] (null for a draw) plus a
  *  plain reason string ("将死" checkmate / "困毙" stalemate — in
@@ -201,6 +218,52 @@ object Rules {
         return out
     }
 
+    /** True when any piece of [bySide] pseudo-legally attacks
+     *  [target] on this layout — the same attack notion
+     *  [isInCheck] uses for generals (flying-generals included,
+     *  which only matters when [target] holds a general). Pure
+     *  local computation over at most 90 squares; no engine. */
+    fun isSquareAttacked(cells: List<Piece?>, target: Pos, bySide: Side): Boolean {
+        for (r in 0..9) {
+            for (c in 0..8) {
+                val from = Pos(c, r)
+                val p = at(cells, from) ?: continue
+                if (p.side != bySide) continue
+                if (isPseudoLegal(cells, from, target)) return true
+            }
+        }
+        return false
+    }
+
+    /** Safety of one legal move, judged exactly the way players
+     *  mean it: play the move, then look at whether the opponent
+     *  attacks the destination square. Attacked means the moved
+     *  piece would be taken next move （送死 / 吃完被反吃）. */
+    fun targetSafety(cells: List<Piece?>, from: Pos, to: Pos): TargetSafety {
+        val piece = at(cells, from) ?: return TargetSafety.SAFE
+        val copy = cells.toMutableList()
+        copy[to.row * 9 + to.col] = piece
+        copy[from.row * 9 + from.col] = null
+        return if (isSquareAttacked(copy, to, piece.side.other())) {
+            TargetSafety.UNSAFE
+        } else {
+            TargetSafety.SAFE
+        }
+    }
+
+    /** Safety for every legal target of the piece on [from],
+     *  computed in one pass. This is the full cost of the board's
+     *  safety markers for one selection: a few dozen simulated
+     *  moves over a 90-cell board, pure arithmetic, well under a
+     *  millisecond — it must never go through the engine. */
+    fun targetSafeties(cells: List<Piece?>, from: Pos): Map<Pos, TargetSafety> {
+        val out = HashMap<Pos, TargetSafety>()
+        for (to in legalTargets(cells, from)) {
+            out[to] = targetSafety(cells, from, to)
+        }
+        return out
+    }
+
     fun allLegalMoves(cells: List<Piece?>, side: Side): List<Move> {
         val out = ArrayList<Move>()
         for (r in 0..9) {
@@ -242,6 +305,38 @@ class GameState {
         private set
 
     fun historyMoves(): List<Move> = history.toList()
+
+    /** Opponent pieces that [side] has captured so far: pieces
+     *  present in the starting layout but no longer on the board.
+     *  Derived from state rather than the move list, so undo,
+     *  restart, handicap starts and editor starts all stay
+     *  correct automatically. Sorted strongest first. */
+    fun capturedBy(side: Side): List<Piece> {
+        val foe = side.other()
+        val missing = ArrayList<Piece>()
+        for (type in PieceType.values()) {
+            if (type == PieceType.GENERAL) continue
+            val started = initialCells.count {
+                it != null && it.side == foe && it.type == type
+            }
+            val alive = cells.count {
+                it != null && it.side == foe && it.type == type
+            }
+            repeat((started - alive).coerceAtLeast(0)) {
+                missing.add(Piece(type, foe))
+            }
+        }
+        return missing.sortedByDescending { materialValue(it.type) }
+    }
+
+    /** Rough material strength of [side]'s pieces still on the
+     *  board, in the usual display points （车 600 / 炮 285 /
+     *  马 270 / 士象 120 / 兵 60). For the captured-pieces strip
+     *  only — never used for adjudication. */
+    fun materialScore(side: Side): Int =
+        cells.sumOf {
+            if (it != null && it.side == side) materialValue(it.type) else 0
+        }
 
     init {
         reset()

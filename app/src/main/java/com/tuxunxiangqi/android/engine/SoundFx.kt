@@ -47,30 +47,54 @@ object SoundFx {
         }
     }
 
+    /** Live raw-clip players right now. Rapid-fire moves (fast
+     *  spectacle speed, quick taps) must not pile MediaPlayers
+     *  up: past the cap a cue is dropped silently instead —
+     *  overlapping wood knocks are natural, a dozen are not. */
+    private val activeRawPlayers = java.util.concurrent.atomic.AtomicInteger(0)
+    private const val MAX_RAW_PLAYERS = 3
+
     /** Plays a bundled clip; returns false (so the caller falls
-     *  back to the synth tone) if anything goes wrong. */
+     *  back to the synth tone) if anything goes wrong. When the
+     *  concurrency cap is hit it returns true on purpose: the
+     *  cue counts as handled, so no synth pile-up follows. */
     private fun playRaw(context: Context, raw: Int): Boolean {
+        if (activeRawPlayers.incrementAndGet() > MAX_RAW_PLAYERS) {
+            activeRawPlayers.decrementAndGet()
+            return true
+        }
         return try {
             thread(isDaemon = true) {
                 var player: MediaPlayer? = null
+                val released = java.util.concurrent.atomic.AtomicBoolean(false)
+                fun releaseOnce() {
+                    if (released.compareAndSet(false, true)) {
+                        try {
+                            player?.release()
+                        } catch (_: Exception) {
+                        }
+                        activeRawPlayers.decrementAndGet()
+                    }
+                }
                 try {
                     player = MediaPlayer.create(context, raw)
-                    if (player == null) return@thread
-                    player.setOnCompletionListener { it.release() }
-                    player.setOnErrorListener { p, _, _ ->
-                        p.release()
+                    if (player == null) {
+                        activeRawPlayers.decrementAndGet()
+                        return@thread
+                    }
+                    player.setOnCompletionListener { releaseOnce() }
+                    player.setOnErrorListener { _, _, _ ->
+                        releaseOnce()
                         true
                     }
                     player.start()
                 } catch (_: Exception) {
-                    try {
-                        player?.release()
-                    } catch (_: Exception) {
-                    }
+                    releaseOnce()
                 }
             }
             true
         } catch (_: Exception) {
+            activeRawPlayers.decrementAndGet()
             false
         }
     }

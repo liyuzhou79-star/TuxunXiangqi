@@ -1,5 +1,7 @@
 package com.tuxunxiangqi.android.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,7 +40,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalView
@@ -123,6 +130,106 @@ private fun fmtClock(ms: Long): String {
     return String.format("%d:%02d", totalSec / 60, totalSec % 60)
 }
 
+/** One captured piece as a small disc in the captured strip. */
+@Composable
+private fun MiniPieceDisc(piece: Piece) {
+    val ink = if (piece.side == Side.RED) Color(0xFFB33A1F) else Color(0xFF2A241C)
+    Box(
+        modifier = Modifier
+            .size(23.dp)
+            .clip(CircleShape)
+            .background(Color(0xFFF3E3BC))
+            .border(1.dp, ink, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = piece.type.label(piece.side),
+            fontFamily = PieceFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp,
+            color = ink
+        )
+    }
+}
+
+/** Captured-pieces strip under the board, the way xiangqi apps
+ *  lay out the taken pieces: one row per side showing what that
+ *  side has captured (strongest first), with the material edge
+ *  marked on the side that is ahead. Renders nothing until the
+ *  first capture. Derived from GameState, so undo and restart
+ *  keep it truthful on their own. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CapturedStrip(state: GameState) {
+    val redCaps = state.capturedBy(Side.RED)
+    val blackCaps = state.capturedBy(Side.BLACK)
+    if (redCaps.isEmpty() && blackCaps.isEmpty()) return
+    val diff = state.materialScore(Side.RED) - state.materialScore(Side.BLACK)
+    fun edgeText(points: Int): String {
+        val pawns = points / 60.0
+        val num = if (pawns == pawns.toInt().toDouble()) {
+            pawns.toInt().toString()
+        } else {
+            String.format("%.1f", pawns)
+        }
+        return "子力占优 ≈ $num 兵"
+    }
+    Column {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                CapturedRow("红方所吃", redCaps, if (diff > 0) edgeText(diff) else null)
+                CapturedRow("黑方所吃", blackCaps, if (diff < 0) edgeText(-diff) else null)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CapturedRow(label: String, caps: List<Piece>, edge: String?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+        if (caps.isEmpty()) {
+            Text(
+                text = "—",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                for (p in caps) MiniPieceDisc(p)
+            }
+        }
+        if (edge != null) {
+            Text(
+                text = edge,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun BoardScreen(
@@ -199,6 +306,21 @@ fun BoardScreen(
     }
     val targets = remember(selected, state.lastMove, state.moveCount) {
         selected?.let { Rules.legalTargets(state.cells, it) } ?: emptyList()
+    }
+    // Safety judgement for the selected piece's targets (green =
+    // survives, red = 送死， green ring = safe capture, no marker
+    // = recaptured capture). Pure rules-layer arithmetic over a
+    // 90-cell board — computed synchronously in this remember so
+    // the markers are on screen in the same frame as the tap;
+    // it must never go through the engine (a UCI round trip
+    // would be felt). Cost is pinned by TargetSafetyTest.
+    val safetyHintsOn = remember { settingsStore.safetyHintsOn }
+    val targetSafety = remember(selected, state.lastMove, state.moveCount, safetyHintsOn) {
+        if (safetyHintsOn && selected != null) {
+            Rules.targetSafeties(state.cells, selected!!)
+        } else {
+            emptyMap()
+        }
     }
     val extraHints = candidates
         .filter { it.rank != selectedRank }
@@ -606,6 +728,7 @@ fun BoardScreen(
                         extraHints = extraHints,
                         flipped = flipped,
                         showCoords = showCoords,
+                        targetSafety = targetSafety,
                         onTap = { pos -> onTap(pos) }
                     )
                 }
@@ -739,12 +862,14 @@ fun BoardScreen(
                             extraHints = extraHints,
                             flipped = flipped,
                             showCoords = showCoords,
+                            targetSafety = targetSafety,
                             onTap = { pos -> onTap(pos) }
                         )
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
+                CapturedStrip(state)
                 // View toggles.
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(

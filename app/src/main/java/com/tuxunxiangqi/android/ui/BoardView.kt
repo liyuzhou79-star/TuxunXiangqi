@@ -2,6 +2,10 @@ package com.tuxunxiangqi.android.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -15,7 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -44,7 +51,9 @@ import com.tuxunxiangqi.android.R
 import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.Piece
 import com.tuxunxiangqi.android.xiangqi.Pos
+import com.tuxunxiangqi.android.xiangqi.Rules
 import com.tuxunxiangqi.android.xiangqi.Side
+import com.tuxunxiangqi.android.xiangqi.TargetSafety
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -63,6 +72,12 @@ private val FaceDeep = Color(0xFFC79A55)
 private val GridInk = Color(0xFF2A1D0E)
 private val RedInk = Color(0xFFB33A1F)
 private val BlackInk = Color(0xFF2A241C)
+
+/** Safety-marker colours, saturated enough to read clearly on
+ *  the walnut face: green = the moved piece survives there,
+ *  red = it would be taken （送死）. */
+private val SafeGreen = Color(0xFF1E9E4A)
+private val DangerRed = Color(0xFFD43A2A)
 
 /** Brush calligraphy for piece glyphs and the river text:
  *  Bakudai Bold （莫大毛筆體）, OFL-1.1, subset to the glyphs the
@@ -140,7 +155,8 @@ fun XiangqiBoard(
     hint: Pair<Pos, Pos>? = null,
     flipped: Boolean = false,
     showCoords: Boolean = false,
-    extraHints: List<Pair<Pos, Pos>> = emptyList()
+    extraHints: List<Pair<Pos, Pos>> = emptyList(),
+    targetSafety: Map<Pos, TargetSafety> = emptyMap()
 ) {
     val measurer = rememberTextMeasurer()
     val wood = rememberWoodBitmap()
@@ -153,11 +169,16 @@ fun XiangqiBoard(
         if (flipped) Pos(8 - p.col, 9 - p.row) else p
     // Move animation: the just-moved piece glides from its origin
     // to its destination over ~180 ms with a slight lift, instead
-    // of teleporting. Keyed on moveCount so undo/redo and review
-    // stepping retrigger it, while the first composition does not.
+    // of teleporting. It fires only when the move count GROWS:
+    // an undo shrinks the count, and replaying the previous
+    // move's glide then would slide a piece the user did not
+    // touch (1.2.0 audit fix). Restart and position loads snap.
     val moveProgress = remember { Animatable(1f) }
+    var prevMoveCount by remember { mutableStateOf(state.moveCount) }
     LaunchedEffect(state.moveCount) {
-        if (state.moveCount > 0 && state.lastMove != null) {
+        val grew = state.moveCount > prevMoveCount
+        prevMoveCount = state.moveCount
+        if (grew && state.lastMove != null) {
             moveProgress.snapTo(0f)
             moveProgress.animateTo(
                 1f,
@@ -168,6 +189,19 @@ fun XiangqiBoard(
         }
     }
     val animating = moveProgress.value < 1f && state.lastMove != null
+    // Check feedback: the general under attack breathes a red
+    // ring so the eye lands on it instantly, on top of the
+    // "将军！" text the screen already shows.
+    val checkPulse = rememberInfiniteTransition(label = "checkPulse")
+    val pulseAlpha by checkPulse.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(durationMillis = 520),
+            RepeatMode.Reverse
+        ),
+        label = "checkPulseAlpha"
+    )
     Canvas(
         modifier = modifier
             .fillMaxWidth()
@@ -198,32 +232,67 @@ fun XiangqiBoard(
 
         // Last-move markers, kept deliberately quiet: a soft
         // glowing dot where the piece came from, and a white glow
-        // ring around the piece where it landed. No frames.
+        // ring around the piece where it landed. No frames. The
+        // destination glow fades in with the glide so it does not
+        // light up before the piece arrives.
         state.lastMove?.let { mv ->
             drawGlowDot(point(mv.from), cell)
-            drawGlowHalo(point(mv.to), cell)
+            drawGlowHalo(point(mv.to), cell, moveProgress.value)
         }
-        // Legal-target hints for the selected piece.
+        // Legal-target hints for the selected piece. When safety
+        // judgements are supplied they drive the colours (user
+        // spec): a quiet square is a green dot when the piece
+        // survives there and a red dot when it would be taken
+        // （送死）; a capture gets a green ring when it cannot be
+        // answered and NO marker at all when it would be
+        // recaptured （吃完被反吃）. Without judgements (safety
+        // hints off) the plain pre-1.2 markers are drawn.
         for (t in legalTargets) {
             val c = point(t)
+            val safety = targetSafety[t]
             if (state.pieceAt(t) == null) {
-                drawCircle(
-                    color = RedInk.copy(alpha = 0.45f),
-                    radius = cell * 0.11f,
-                    center = c
-                )
+                when (safety) {
+                    TargetSafety.SAFE -> drawSafetyDot(c, cell, SafeGreen)
+                    TargetSafety.UNSAFE -> drawSafetyDot(c, cell, DangerRed)
+                    null -> drawCircle(
+                        color = RedInk.copy(alpha = 0.45f),
+                        radius = cell * 0.11f,
+                        center = c
+                    )
+                }
             } else {
-                drawCircle(
-                    color = RedInk.copy(alpha = 0.16f),
-                    radius = cell * 0.46f,
-                    center = c
-                )
-                drawCircle(
-                    color = RedInk,
-                    radius = cell * 0.46f,
-                    center = c,
-                    style = Stroke(width = cell * 0.045f)
-                )
+                when (safety) {
+                    TargetSafety.SAFE -> {
+                        drawCircle(
+                            color = SafeGreen.copy(alpha = 0.16f),
+                            radius = cell * 0.46f,
+                            center = c
+                        )
+                        drawCircle(
+                            color = SafeGreen,
+                            radius = cell * 0.46f,
+                            center = c,
+                            style = Stroke(width = cell * 0.05f)
+                        )
+                    }
+                    TargetSafety.UNSAFE -> {
+                        // Deliberately nothing: a capture that gets
+                        // recaptured carries no colour at all.
+                    }
+                    null -> {
+                        drawCircle(
+                            color = RedInk.copy(alpha = 0.16f),
+                            radius = cell * 0.46f,
+                            center = c
+                        )
+                        drawCircle(
+                            color = RedInk,
+                            radius = cell * 0.46f,
+                            center = c,
+                            style = Stroke(width = cell * 0.045f)
+                        )
+                    }
+                }
             }
         }
         // Pieces. While the move animation runs, the moved piece
@@ -256,7 +325,28 @@ fun XiangqiBoard(
         }
         // The bright rim of the destination glow, above the piece
         // so it wraps the disc that just landed.
-        state.lastMove?.let { mv -> drawGlowRing(point(mv.to), cell) }
+        state.lastMove?.let { mv ->
+            drawGlowRing(point(mv.to), cell, moveProgress.value)
+        }
+        // Check: a pulsing red ring around the general that is
+        // under attack, so the threatened piece is unmistakable.
+        if (state.inCheck) {
+            Rules.generalPos(state.cells, state.turn)?.let { gp ->
+                val c = point(gp)
+                val r = cell * 0.44f
+                drawCircle(
+                    color = DangerRed.copy(alpha = 0.13f * pulseAlpha),
+                    radius = r * 1.36f,
+                    center = c
+                )
+                drawCircle(
+                    color = DangerRed.copy(alpha = pulseAlpha),
+                    radius = r * 1.21f,
+                    center = c,
+                    style = Stroke(width = cell * 0.055f)
+                )
+            }
+        }
         // Engine hint arrow, drawn on top so it stays readable.
         hint?.let { (from, to) ->
             drawHintArrow(point(from), point(to), cell)
@@ -520,16 +610,33 @@ private fun DrawScope.drawGlowDot(center: Offset, cell: Float) {
     )
 }
 
+/** A safety dot on a quiet target square: a pale underlay so
+ *  the colour stays readable on the wood grain, then the solid
+ *  green/red core. */
+private fun DrawScope.drawSafetyDot(center: Offset, cell: Float, color: Color) {
+    drawCircle(
+        color = Color.White.copy(alpha = 0.38f),
+        radius = cell * 0.165f,
+        center = center
+    )
+    drawCircle(
+        color = color.copy(alpha = 0.95f),
+        radius = cell * 0.115f,
+        center = center
+    )
+}
+
 /** Soft white halo under the destination piece (drawn before
  *  the pieces); its bright rim is drawn separately, above the
- *  piece, by [drawGlowRing]. */
-private fun DrawScope.drawGlowHalo(center: Offset, cell: Float) {
+ *  piece, by [drawGlowRing]. [alphaScale] follows the glide
+ *  progress so the glow arrives with the piece. */
+private fun DrawScope.drawGlowHalo(center: Offset, cell: Float, alphaScale: Float = 1f) {
     val r = cell * 0.44f
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.50f),
-                Color.White.copy(alpha = 0.18f),
+                Color.White.copy(alpha = 0.50f * alphaScale),
+                Color.White.copy(alpha = 0.18f * alphaScale),
                 Color.Transparent
             ),
             center = center,
@@ -542,16 +649,16 @@ private fun DrawScope.drawGlowHalo(center: Offset, cell: Float) {
 
 /** Destination marker: a clean white ring of light hugging the
  *  piece that just moved. */
-private fun DrawScope.drawGlowRing(center: Offset, cell: Float) {
+private fun DrawScope.drawGlowRing(center: Offset, cell: Float, alphaScale: Float = 1f) {
     val r = cell * 0.44f
     drawCircle(
-        color = Color.White.copy(alpha = 0.95f),
+        color = Color.White.copy(alpha = 0.95f * alphaScale),
         radius = r * 1.10f,
         center = center,
         style = Stroke(width = cell * 0.045f)
     )
     drawCircle(
-        color = Color.White.copy(alpha = 0.35f),
+        color = Color.White.copy(alpha = 0.35f * alphaScale),
         radius = r * 1.22f,
         center = center,
         style = Stroke(width = cell * 0.06f)

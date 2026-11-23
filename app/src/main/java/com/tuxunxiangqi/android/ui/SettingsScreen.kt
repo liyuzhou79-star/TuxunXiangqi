@@ -69,6 +69,7 @@ fun SettingsScreen(
     var clock by remember { mutableStateOf(store.defaultClockMinutes) }
     var analysisMs by remember { mutableStateOf(store.defaultAnalysisMs.toFloat()) }
     var soundOn by remember { mutableStateOf(store.soundOn) }
+    var safetyHintsOn by remember { mutableStateOf(store.safetyHintsOn) }
     var updateText by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(false) }
     var importOpen by remember { mutableStateOf(false) }
@@ -221,6 +222,24 @@ fun SettingsScreen(
                     onCheckedChange = {
                         soundOn = it
                         store.soundOn = it
+                    }
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("落点安危提示", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = "选中棋子时给落点分安危：绿点＝落过去安全，红点＝会被吃掉（送死）；能吃的子，绿圈＝吃完安全，没标记＝吃完会被反吃。由本地规则即时算出，不联网、不等引擎。关掉就回到只标落点的老样子。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = safetyHintsOn,
+                    onCheckedChange = {
+                        safetyHintsOn = it
+                        store.safetyHintsOn = it
                     }
                 )
             }
