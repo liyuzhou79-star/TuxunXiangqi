@@ -277,7 +277,7 @@ object OpeningBook {
             "g3g4" to "兵三进一",
             "c3c4" to "兵七进一",
             "i0h0" to "车一平二",
-        )
+        ),
         "h2e2 h7e7 h0g2 h9g7 b0c2 b9c7 b2b4" to listOf(
             "i9h9" to "车9平8",
             "c6c5" to "卒3进1",
