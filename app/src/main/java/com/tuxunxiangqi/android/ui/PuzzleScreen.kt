@@ -9,6 +9,9 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -178,14 +181,22 @@ fun PuzzleScreen(onBack: () -> Unit) {
     } else {
 
     val daily = Puzzles.daily(Calendar.getInstance().get(Calendar.DAY_OF_YEAR))
+    val sortedPuzzles = Puzzles.all.sortedBy { it.id }
+    val shownPuzzles = Puzzles.filterPuzzles(
+        sortedPuzzles, diffFilter, unsolvedOnly, solvedIds
+    )
 
-    Column(
+    // LazyColumn since 1.72.0: with 125 puzzles the old
+    // Column+verticalScroll composed every row up front; now
+    // only the visible rows compose, same as the records list
+    // (1.13.0). Content and order are unchanged.
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(padding)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(padding),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
     ) {
+        item {
         Text(
             text = "全部是红先胜的经典子力残局。你执红，引擎执黑防守，还兼任裁判：哪一步把优势走没了，它会当场提醒。解出 " +
                 solvedIds.size + " / " + Puzzles.all.size + " 题。",
@@ -281,6 +292,8 @@ fun PuzzleScreen(onBack: () -> Unit) {
             }
         }
         Spacer(Modifier.height(14.dp))
+        }
+        item {
         Text(
             text = "按难度筛选",
             style = MaterialTheme.typography.bodySmall,
@@ -307,10 +320,8 @@ fun PuzzleScreen(onBack: () -> Unit) {
             )
         }
         Spacer(Modifier.height(10.dp))
-        val sortedPuzzles = Puzzles.all.sortedBy { it.id }
-        val shownPuzzles = Puzzles.filterPuzzles(
-            sortedPuzzles, diffFilter, unsolvedOnly, solvedIds
-        )
+        }
+        item {
         // One-tap practice (1.20.0): a random puzzle from what
         // the filters currently show, unsolved ones first.
         OutlinedButton(
@@ -325,7 +336,9 @@ fun PuzzleScreen(onBack: () -> Unit) {
             enabled = shownPuzzles.isNotEmpty()
         ) { Text("随手来一题（优先未解）") }
         Spacer(Modifier.height(14.dp))
+        }
         if (shownPuzzles.isEmpty()) {
+        item {
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -340,6 +353,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(14.dp))
         }
+        }
         for (category in Puzzles.categoryOrder) {
             val group = Puzzles.filterPuzzles(
                 sortedPuzzles.filter { Puzzles.categoryOf(it.id) == category },
@@ -347,6 +361,7 @@ fun PuzzleScreen(onBack: () -> Unit) {
             )
             if (group.isEmpty()) continue
             val groupSolved = group.count { it.id in solvedIds }
+            item {
             Text(
                 text = category + " · " + group.size + " 题" +
                     if (groupSolved > 0) "（已解 $groupSolved）" else "",
@@ -365,7 +380,8 @@ fun PuzzleScreen(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
-            for (p in group) {
+            }
+            items(group, key = { it.id }) { p ->
             val solved = p.id in solvedIds
             ListItem(
                 headlineContent = {
@@ -421,9 +437,9 @@ fun PuzzleScreen(onBack: () -> Unit) {
             )
             HorizontalDivider()
             }
-            Spacer(Modifier.height(8.dp))
+            item { Spacer(Modifier.height(8.dp)) }
         }
-        Spacer(Modifier.height(24.dp))
+        item { Spacer(Modifier.height(24.dp)) }
     }
     }
     }
