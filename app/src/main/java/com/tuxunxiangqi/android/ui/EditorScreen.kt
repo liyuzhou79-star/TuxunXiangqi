@@ -56,6 +56,34 @@ fun validatePosition(cells: List<Piece?>): String? {
     val blackG = Rules.generalPos(cells, Side.BLACK)
     if (redG == null) return "红方还没有放帅"
     if (blackG == null) return "黑方还没有放将"
+    // Piece-count caps (1.76.0 audit): the palette places pieces
+    // freely, and until now nothing stopped a position with two
+    // red generals or six chariots from starting a game — the
+    // rules layer treats every general-typed piece as royal and
+    // uncapturable, and the engine's behaviour on such FENs is
+    // undefined. One general per side; the standard set otherwise.
+    val caps: List<Triple<PieceType, Int, String>> = listOf(
+        Triple(PieceType.GENERAL, 1, "将帅"),
+        Triple(PieceType.CHARIOT, 2, "车"),
+        Triple(PieceType.HORSE, 2, "马"),
+        Triple(PieceType.CANNON, 2, "炮"),
+        Triple(PieceType.ADVISOR, 2, "仕/士"),
+        Triple(PieceType.ELEPHANT, 2, "相/象"),
+        Triple(PieceType.PAWN, 5, "兵/卒")
+    )
+    for (side in Side.values()) {
+        val sideName = if (side == Side.RED) "红方" else "黑方"
+        for ((type, cap, label) in caps) {
+            val n = cells.count { it != null && it.type == type && it.side == side }
+            if (n > cap) {
+                return if (type == PieceType.GENERAL) {
+                    sideName + "只能放一个" + if (side == Side.RED) "帅" else "将"
+                } else {
+                    sideName + label + "最多放" + cap + "个，现在有" + n + "个"
+                }
+            }
+        }
+    }
     fun inPalace(side: Side, p: Pos): Boolean {
         if (p.col !in 3..5) return false
         return if (side == Side.RED) p.row in 7..9 else p.row in 0..2

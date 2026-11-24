@@ -739,6 +739,36 @@ object OpeningBook {
             "i3i4" to "兵一进一",
             "a0a1" to "车九进一",
         ),
+        "h2e2 h7e7 h0g2 h9g7 b0c2 b9c7 b2b4 i9h9 c3c4 c6c5 g3g4 g6g5 a3a4 h9h8 i0h0 a9a8 g4g5 e6e5 g5g6 a6a5 e3e4 i6i5" to listOf(
+            "i3i4" to "兵一进一",
+            "a0a1" to "车九进一",
+            "b4b5" to "炮八进一",
+        ),
+        "h2e2 h9g7 h0g2 a9a8 b0c2 b9c7 i0h0 g6g5 b2b4 i9h9 g3g4 c6c5 a3a4 g9e7 c3c4 h9h8 g4g5 h8h9 g5g6 a6a5 e3e4 e6e5" to listOf(
+            "i3i4" to "兵一进一",
+            "a0a1" to "车九进一",
+            "b4b5" to "炮八进一",
+        ),
+        "c3c4 c6c5 c4c5 h9g7 h2e2 b9c7 h0g2 g9e7 b2b4 i9h9 b0c2 a9a8 g3g4 g6g5 a3a4 h9h8 i0h0 a8a7 g4g5 a6a5 c5c6 e6e5" to listOf(
+            "e3e4" to "兵五进一",
+            "g5g6" to "兵三进一",
+            "a0a1" to "车九进一",
+        ),
+        "h2e2 b9c7 h0g2 c6c5 b0c2 h9g7 i0h0 i9h9 c3c4 a9a8 b2b4 g9e7 g3g4 g6g5 a3a4 h9h8 g4g5 h8h9 g5g6 a6a5 e3e4 e6e5" to listOf(
+            "i3i4" to "兵一进一",
+            "a0a1" to "车九进一",
+            "b4b5" to "炮八进一",
+        ),
+        "h2e2 h7e7 h0g2 h9g7 b0c2 b9c7 b2b4 i9h9 g3g4 c6c5 c3c4 g6g5 a3a4 h9h8 i0h0 a9a8 g4g5 e6e5 g5g6 a8a7 a4a5 e5e4 i3i4" to listOf(
+            "i6i5" to "卒9进1",
+            "h8h7" to "车8进1",
+            "a7a8" to "车1退1",
+        ),
+        "g0e2 c9e7 b2b4 b9c7 h0g2 h9g7 i0h0 i9h9 g3g4 c6c5 a3a4 g6g5 c3c4 a9a8 b0c2 h9h8 a4a5 e6e5 g4g5 a8a7 e3e4 i6i5 g5g6" to listOf(
+            "i5i4" to "卒9进1",
+            "a7a8" to "车1退1",
+            "b7b6" to "炮2进1",
+        ),
     )
 
     fun knownHistories(): Set<String> = book.keys
