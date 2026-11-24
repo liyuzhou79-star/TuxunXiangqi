@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -58,7 +60,7 @@ fun OpeningScreen(
     var selUci by remember { mutableStateOf<String?>(
         OpeningBook.lookup(emptyList()).firstOrNull()?.first
     ) }
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
     val suggestions = remember(selHistory) { OpeningBook.lookup(selHistory) }
@@ -82,20 +84,25 @@ fun OpeningScreen(
     fun selectNode(node: OpeningBook.BookNode) {
         selHistory = node.historyUci
         selUci = node.suggestions.firstOrNull()?.first
-        scope.launch { scrollState.animateScrollTo(0) }
+        scope.launch { listState.animateScrollToItem(0) }
     }
 
     Scaffold(
         topBar = { SubPageTopBar("开局库", onBack) },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-    Column(
+    // LazyColumn since 1.73.0: with 140 book nodes the old
+    // Column+verticalScroll composed the header (with the
+    // preview board) and every node card up front; now only
+    // the visible cards compose. Content and order unchanged.
+    LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .padding(padding)
-            .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(padding),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
     ) {
+        item {
         Text(
             text = "内置定式共 " + allNodes.size + " 个节点、" + totalSuggestions +
                 " 条建议着法，对局分析时也会自动引用。点任意一条线，" +
@@ -177,7 +184,8 @@ fun OpeningScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        for (node in nodes) {
+        }
+        items(nodes, key = { it.historyUci.joinToString(" ") }) { node ->
             val isSel = node.historyUci == selHistory
             Card(
                 onClick = { selectNode(node) },
@@ -224,7 +232,7 @@ fun OpeningScreen(
             }
             Spacer(Modifier.height(8.dp))
         }
-        Spacer(Modifier.height(24.dp))
+        item { Spacer(Modifier.height(24.dp)) }
     }
     }
 }
