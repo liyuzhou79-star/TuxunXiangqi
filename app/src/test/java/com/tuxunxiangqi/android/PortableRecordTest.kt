@@ -104,7 +104,7 @@ class PortableRecordTest {
         val recs = listOf(
             sample(1L, "第一局", listOf("h2e2", "h9g7")),
             sample(2L, "第二局", listOf("b2e2")),
-            sample(3L, "第三局", listOf("h0g2", "b9c7", "g2e3"))
+            sample(3L, "第三局", listOf("h0g2", "b9c7", "g2e1"))
         )
         val back = parsePortableRecords(recs.toPortableTextBundle(), 5000L)
         assertEquals(3, back.size)

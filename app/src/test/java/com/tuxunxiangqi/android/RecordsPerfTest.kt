@@ -49,7 +49,13 @@ class RecordsPerfTest {
 
     private fun makeRecords(n: Int): List<GameRecord> {
         val modes = listOf("人机对弈 · 普通", "人人对弈", "AI 表演赛")
-        val moves = (1..120).map { "h2e2" }
+        // A legal 120-move shuttle (two horses stepping out and
+        // back): since the 1.80.0 import gate keeps only the
+        // replayable prefix, dummy repeated moves would no
+        // longer round-trip at full length — real exports only
+        // ever contain played, legal moves anyway.
+        val shuttle = listOf("h0g2", "h9g7", "g2h0", "g7h9")
+        val moves = (0 until 120).map { shuttle[it % 4] }
         return (1..n).map { i ->
             GameRecord(
                 id = i.toLong(),
