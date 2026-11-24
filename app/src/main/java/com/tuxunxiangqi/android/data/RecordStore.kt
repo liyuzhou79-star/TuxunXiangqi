@@ -4,6 +4,8 @@ import android.content.Context
 import com.tuxunxiangqi.android.xiangqi.Fen
 import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.OpeningBook
+import com.tuxunxiangqi.android.xiangqi.Rules
+import com.tuxunxiangqi.android.xiangqi.Side
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -482,6 +484,29 @@ private fun parsePortableBlock(lines: List<String>, id: Long): GameRecord? {
         }
     }
     if (fen.isBlank()) return null
+    // Import gate (1.80.0 audit): until now any non-blank FEN
+    // string entered the library — the review page then fell
+    // back to the standard start position for unparseable FENs,
+    // and its replay silently stopped at the first unplayable
+    // move while the record still claimed the full move count.
+    // Validate here instead: the FEN must parse and contain
+    // both generals, and only the replayable prefix of the move
+    // list is kept, so what is stored is exactly what replays.
+    val parsedFen = Fen.fromFen(fen) ?: return null
+    val (startCells, startTurn) = parsedFen
+    if (Rules.generalPos(startCells, Side.RED) == null ||
+        Rules.generalPos(startCells, Side.BLACK) == null
+    ) {
+        return null
+    }
+    val scratch = GameState()
+    scratch.newGame(startCells, startTurn)
+    val keptMoves = ArrayList<String>()
+    for (m in moves) {
+        val ft = Fen.parseUciMove(m) ?: break
+        if (!scratch.tryMove(ft.first, ft.second)) break
+        keptMoves.add(m)
+    }
     return GameRecord(
         id = id,
         title = title,
@@ -489,7 +514,7 @@ private fun parsePortableBlock(lines: List<String>, id: Long): GameRecord? {
         modeLabel = mode,
         resultText = result,
         initialFen = fen,
-        movesUci = moves,
+        movesUci = keptMoves,
         evals = evals,
         marks = marks,
         deep = deep

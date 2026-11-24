@@ -48,10 +48,40 @@ class PortableRecordTest {
 
     @Test
     fun minimalRecordParses() {
-        val back = parsePortableRecord("[FEN] abc w - - 0 1\n[着法UCI] h2e2\n", 7L)
+        val back = parsePortableRecord(
+            "[FEN] rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1\n[着法UCI] h2e2\n",
+            7L
+        )
         assertNotNull(back)
         assertEquals(listOf("h2e2"), back!!.movesUci)
         assertEquals(7L, back.id)
+    }
+
+    /** The 1.80.0 import gate: a block whose FEN does not parse
+     *  or lacks a general is refused outright (before 1.80.0 any
+     *  non-blank string entered the library and the review page
+     *  silently fell back to the standard start position). */
+    @Test
+    fun unusableFenIsRejected() {
+        assertNull(parsePortableRecord("[FEN] abc w - - 0 1\n[着法UCI] h2e2\n", 7L))
+        assertNull(
+            parsePortableRecord(
+                "[FEN] 9/9/9/9/9/9/9/9/9/4K4 w - - 0 1\n[着法UCI] h2e2\n", 7L
+            )
+        )
+    }
+
+    /** Only the replayable prefix of the move list is kept, so
+     *  the stored record is exactly what the review page can
+     *  replay — a corrupt token or an illegal move ends the
+     *  list there instead of leaving phantom steps behind. */
+    @Test
+    fun movesTruncateAtFirstUnplayable() {
+        val fen = "[FEN] rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1\n"
+        val corrupt = parsePortableRecord(fen + "[着法UCI] h2e2 zzzz h0g2\n", 7L)
+        assertEquals(listOf("h2e2"), corrupt!!.movesUci)
+        val illegal = parsePortableRecord(fen + "[着法UCI] h2e2 h9g7 a0a9\n", 7L)
+        assertEquals(listOf("h2e2", "h9g7"), illegal!!.movesUci)
     }
 
     private fun sample(id: Long, title: String, moves: List<String>) = GameRecord(
@@ -74,7 +104,7 @@ class PortableRecordTest {
         val recs = listOf(
             sample(1L, "第一局", listOf("h2e2", "h9g7")),
             sample(2L, "第二局", listOf("b2e2")),
-            sample(3L, "第三局", listOf("h0g2", "b9c7", "g2g7"))
+            sample(3L, "第三局", listOf("h0g2", "b9c7", "g2e3"))
         )
         val back = parsePortableRecords(recs.toPortableTextBundle(), 5000L)
         assertEquals(3, back.size)
