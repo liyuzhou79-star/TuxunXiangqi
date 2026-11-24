@@ -35,6 +35,31 @@ class OpeningBookTest {
         }
     }
 
+    /** Tree connectivity (1.70.0): the book must be one connected
+     *  tree — every non-root history's parent must be a known
+     *  history and the connecting move must be among the parent's
+     *  suggestions. The 1.70.0 audit found two orphan nodes in the
+     *  顺炮 line (their parents were never written) and one missing
+     *  link （炮2平5 after 中炮）, which no legality or name check
+     *  could see; this test keeps the tree whole. */
+    @Test
+    fun bookTreeIsConnected() {
+        val known = OpeningBook.knownHistories()
+        for (history in known) {
+            if (history.isBlank()) continue
+            val moves = history.split(" ")
+            val parent = moves.dropLast(1)
+            assertTrue(
+                "orphan node '$history': parent '${parent.joinToString(" ")}' missing",
+                parent.joinToString(" ") in known
+            )
+            assertTrue(
+                "bad link '$history': ${moves.last()} not suggested by parent",
+                OpeningBook.lookup(parent).any { it.first == moves.last() }
+            )
+        }
+    }
+
     /** Browsing (1.15.0): allNodes covers exactly the known
      *  histories, root first with an empty history. */
     @Test
@@ -158,7 +183,7 @@ class OpeningBookTest {
         fun normalise(s: String): String = s
             .replace('傌', '马').replace('馬', '马')
             .replace('俥', '车').replace('車', '车')
-        assertEquals(126, OpeningBook.knownHistories().size)
+        assertEquals(134, OpeningBook.knownHistories().size)
         for (history in OpeningBook.knownHistories()) {
             val gs = GameState()
             val moves = if (history.isBlank()) emptyList() else history.split(" ")

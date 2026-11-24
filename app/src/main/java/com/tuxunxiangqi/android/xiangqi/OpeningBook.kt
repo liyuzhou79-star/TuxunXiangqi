@@ -23,6 +23,7 @@ object OpeningBook {
             "h9g7" to "马8进7",
             "b9c7" to "马2进3",
             "h7e7" to "炮8平5（顺炮）",
+            "b7e7" to "炮2平5（顺炮）",
             "c6c5" to "卒3进1",
         ),
         "b2e2" to listOf(
@@ -72,6 +73,11 @@ object OpeningBook {
             "b0c2" to "马八进七",
             "b2b4" to "炮八进二",
         ),
+        "h2e2 h7e7" to listOf(
+            "h0g2" to "马二进三",
+            "b0c2" to "马八进七",
+            "b2b4" to "炮八进二",
+        ),
         "h2e2 h9g7 h0g2 a9a8" to listOf(
             "b0c2" to "马八进七",
             "a3a4" to "兵九进一",
@@ -112,6 +118,11 @@ object OpeningBook {
             "h9g7" to "马8进7",
             "b9c7" to "马2进3",
             "i9i8" to "车9进1",
+        ),
+        "h2e2 h7e7 h0g2 h9g7" to listOf(
+            "b0c2" to "马八进七",
+            "c3c4" to "兵七进一",
+            "i0h0" to "车一平二",
         ),
         "b2e2 b9c7 h0g2" to listOf(
             "h7e7" to "炮8平5",
@@ -637,6 +648,36 @@ object OpeningBook {
             "g5g6" to "兵三进一",
             "a4a5" to "兵九进一",
             "h0h4" to "车二进四",
+        ),
+        "h2e2 h7e7 h0g2 h9g7 b0c2 b9c7 b2b4 i9h9 g3g4 c6c5 c3c4 g6g5 a3a4 h9h8 i0h0 a9a8 g4g5 e6e5 g5g6 a8a7" to listOf(
+            "a4a5" to "兵九进一",
+            "e3e4" to "兵五进一",
+            "a0a1" to "车九进一",
+        ),
+        "g0e2 c9e7 b2b4 b9c7 h0g2 h9g7 i0h0 i9h9 g3g4 c6c5 a3a4 g6g5 c3c4 a9a8 b0c2 h9h8 a4a5 e6e5 g4g5 a8a7" to listOf(
+            "e3e4" to "兵五进一",
+            "g5g6" to "兵三进一",
+            "a0a1" to "车九进一",
+        ),
+        "h2e2 h7e7 h0g2 h9g7 b0c2 b9c7 b2b4 i9h9 c3c4 c6c5 g3g4 g6g5 a3a4 h9h8 i0h0 a9a8 g4g5 e6e5 g5g6" to listOf(
+            "a6a5" to "卒1进1",
+            "e5e4" to "卒5进1",
+            "a8a7" to "车1进1",
+        ),
+        "h2e2 h9g7 h0g2 a9a8 b0c2 b9c7 i0h0 g6g5 b2b4 i9h9 g3g4 c6c5 a3a4 g9e7 c3c4 h9h8 g4g5 h8h9 g5g6" to listOf(
+            "a6a5" to "卒1进1",
+            "e6e5" to "卒5进1",
+            "a8a7" to "车1进1",
+        ),
+        "c3c4 c6c5 c4c5 h9g7 h2e2 b9c7 h0g2 g9e7 b2b4 i9h9 b0c2 a9a8 g3g4 g6g5 a3a4 h9h8 i0h0 a8a7 g4g5" to listOf(
+            "a6a5" to "卒1进1",
+            "e6e5" to "卒5进1",
+            "a7a8" to "车1退1",
+        ),
+        "h2e2 b9c7 h0g2 c6c5 b0c2 h9g7 i0h0 i9h9 c3c4 a9a8 b2b4 g9e7 g3g4 g6g5 a3a4 h9h8 g4g5 h8h9 g5g6" to listOf(
+            "a6a5" to "卒1进1",
+            "e6e5" to "卒5进1",
+            "a8a7" to "车1进1",
         ),
     )
 

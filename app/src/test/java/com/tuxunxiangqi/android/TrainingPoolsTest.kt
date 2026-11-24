@@ -106,8 +106,10 @@ class TrainingPoolsTest {
         val pool = GuessPositions.opening
         // Derived from the book's 4–6 ply nodes: 12 when the
         // book had 36 nodes, 17 at 42 nodes (1.31.0), 20 since
-        // the book grew to 48 (1.35.0 added three 6-ply nodes).
-        assertEquals(20, pool.size)
+        // the book grew to 48 (1.35.0 added three 6-ply nodes),
+        // 21 since 1.70.0 (the tree audit filled the missing
+        // 4-ply 顺炮 node h2e2 h7e7 h0g2 h9g7).
+        assertEquals(21, pool.size)
         assertEquals(pool.size, pool.map { it.second }.toSet().size)
         for ((label, fen) in pool) {
             val parsed = com.tuxunxiangqi.android.xiangqi.Fen.fromFen(fen)
