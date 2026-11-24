@@ -104,7 +104,7 @@ class EditorStartTest {
         // Both pieces are immobile where they stand (their move
         // rules only allow their home territory), but the rest
         // of the position plays normally.
-        val gs = stateOf("4k4/9/B8/9/9/A8/9/9/9/4K3R w - - 0 1")
+        val gs = stateOf("4k4/9/B8/9/9/A8/9/9/9/3K4R w - - 0 1")
         assertNull(gs.result)
         assertTrue(
             Rules.legalTargets(gs.cells, com.tuxunxiangqi.android.xiangqi.Pos(0, 5)).isEmpty()
