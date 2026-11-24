@@ -46,7 +46,22 @@ class PuzzleFenTest {
     @Test
     fun allPuzzleFensAreSane() {
         for (p in Puzzles.all) checkFen(p.fen)
-        assertEquals(121, Puzzles.all.size)
+        assertEquals(125, Puzzles.all.size)
+    }
+
+    /** No two puzzles may share a position (1.71.0): the full
+     *  library audit found #108 duplicating #100's board — the
+     *  same position had been collected twice under different
+     *  titles. Batch-local checks cannot see cross-batch
+     *  duplicates; this one can. */
+    @Test
+    fun noTwoPuzzlesShareAPosition() {
+        val boards = Puzzles.all.map { it.fen.substringBefore(' ') }
+        assertEquals(
+            "duplicate puzzle positions: " +
+                boards.groupingBy { it }.eachCount().filter { it.value > 1 }.keys,
+            boards.size, boards.toSet().size
+        )
     }
 
     @Test
