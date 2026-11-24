@@ -64,6 +64,20 @@ class PuzzleFenTest {
         )
     }
 
+    /** No two puzzles may share a display title (1.90.0): the
+     *  title audit found 8 pairs of distinct positions carrying
+     *  the same name, which reads as a duplicate in the list.
+     *  The later entry of each pair now carries a （二） suffix. */
+    @Test
+    fun noTwoPuzzlesShareATitle() {
+        val titles = Puzzles.all.map { it.title }
+        assertEquals(
+            "duplicate puzzle titles: " +
+                titles.groupingBy { it }.eachCount().filter { it.value > 1 }.keys,
+            titles.size, titles.toSet().size
+        )
+    }
+
     @Test
     fun everyPuzzleHasCategoryAndSaneDifficulty() {
         assertTrue(
