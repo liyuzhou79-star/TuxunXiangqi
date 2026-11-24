@@ -58,6 +58,27 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
+/** True when [latest] (a dotted version like "1.110.0") is
+ *  strictly newer than [current]. Compares numeric segments,
+ *  not the raw strings: "1.100.0" must beat "1.99.0", and an
+ *  install that is AHEAD of the release page must not be told
+ *  there is a "new" older version (the pre-1.110.0 check used
+ *  plain string inequality and got both wrong). Unparseable
+ *  input is never "newer". Pure, pinned by UpdateVersionTest. */
+fun isNewerVersion(latest: String, current: String): Boolean {
+    fun parts(v: String): List<Int>? =
+        v.trim().removePrefix("v").split(".")
+            .map { it.toIntOrNull() ?: return null }
+    val a = parts(latest) ?: return false
+    val b = parts(current) ?: return false
+    for (i in 0 until maxOf(a.size, b.size)) {
+        val x = a.getOrElse(i) { 0 }
+        val y = b.getOrElse(i) { 0 }
+        if (x != y) return x > y
+    }
+    return false
+}
+
 /** Settings: theme, game defaults, data backup/restore and the
  *  manual update check — the app's only networking, and only when
  *  the user taps the button. */
@@ -195,10 +216,13 @@ fun SettingsScreen(
                     "网络没通，没查成。等有网了再点一次。"
                 outcome.startsWith("FOUND:") -> {
                     val latest = outcome.removePrefix("FOUND:")
-                    if (latest.isNotBlank() && latest != versionName) {
-                        "发现新版本 $latest（你现在是 $versionName），去发布页下载最新安装包。"
-                    } else {
-                        "你用的已经是最新版本（$versionName）。"
+                    when {
+                        latest.isNotBlank() && isNewerVersion(latest, versionName) ->
+                            "发现新版本 $latest（你现在是 $versionName），去发布页下载最新安装包。"
+                        latest.isNotBlank() && latest != versionName ->
+                            "你用的版本（$versionName）比发布页上的（$latest）还新，不用更新。"
+                        else ->
+                            "你用的已经是最新版本（$versionName）。"
                     }
                 }
                 else -> "检查没成功（$outcome），稍后再试。"
