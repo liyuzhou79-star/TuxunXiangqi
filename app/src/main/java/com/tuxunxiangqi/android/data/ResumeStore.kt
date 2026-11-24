@@ -37,6 +37,66 @@ data class ResumeGame(
     }
 }
 
+/** The in-progress game's JSON form — one codec shared by the
+ *  on-disk snapshot and the data backup (which carries the game
+ *  since 1.75.0), so the two can never drift apart. */
+fun resumeGameToJson(game: ResumeGame): JSONObject {
+    val o = JSONObject()
+    o.put("mode", game.modeName)
+    o.put("level", game.levelLabel)
+    o.put("humanRed", game.humanSideRed)
+    o.put("handicap", game.handicapLabel)
+    o.put("strength", game.strength)
+    o.put("clock", game.clockMinutes)
+    o.put("redMs", game.redMs)
+    o.put("blackMs", game.blackMs)
+    o.put("fen", game.initialFen)
+    val moves = JSONArray()
+    for (m in game.movesUci) moves.put(m)
+    o.put("moves", moves)
+    val evals = JSONObject()
+    for ((k, v) in game.evals) evals.put(k.toString(), v)
+    o.put("evals", evals)
+    o.put("savedAt", game.savedAtMs)
+    if (game.recordId != null) o.put("recordId", game.recordId)
+    return o
+}
+
+/** Parses the [resumeGameToJson] form back; null on any
+ *  malformed content, so a corrupt snapshot or backup section
+ *  simply reads as "no game in progress". */
+fun resumeGameFromJson(o: JSONObject): ResumeGame? {
+    return try {
+        val moves = ArrayList<String>()
+        val movesArr = o.optJSONArray("moves") ?: JSONArray()
+        for (j in 0 until movesArr.length()) moves.add(movesArr.getString(j))
+        val evals = HashMap<Int, Int>()
+        val evalsObj = o.optJSONObject("evals") ?: JSONObject()
+        val keys = evalsObj.keys()
+        while (keys.hasNext()) {
+            val k = keys.next()
+            evals[k.toInt()] = evalsObj.getInt(k)
+        }
+        ResumeGame(
+            modeName = o.optString("mode", "PVP"),
+            levelLabel = o.optString("level", "普通"),
+            humanSideRed = o.optBoolean("humanRed", true),
+            handicapLabel = o.optString("handicap", "不让子"),
+            strength = o.optInt("strength", 5),
+            clockMinutes = o.optInt("clock", 0),
+            redMs = o.optLong("redMs", 0L),
+            blackMs = o.optLong("blackMs", 0L),
+            initialFen = o.optString("fen", ""),
+            movesUci = moves,
+            evals = evals,
+            savedAtMs = o.optLong("savedAt", 0L),
+            recordId = if (o.has("recordId")) o.getLong("recordId") else null
+        )
+    } catch (_: Exception) {
+        null
+    }
+}
+
 /** JSON file storage for the single in-progress game. */
 class ResumeStore(context: Context) {
 
@@ -45,32 +105,7 @@ class ResumeStore(context: Context) {
     fun load(): ResumeGame? {
         if (!file.exists()) return null
         return try {
-            val o = JSONObject(file.readText())
-            val moves = ArrayList<String>()
-            val movesArr = o.optJSONArray("moves") ?: JSONArray()
-            for (j in 0 until movesArr.length()) moves.add(movesArr.getString(j))
-            val evals = HashMap<Int, Int>()
-            val evalsObj = o.optJSONObject("evals") ?: JSONObject()
-            val keys = evalsObj.keys()
-            while (keys.hasNext()) {
-                val k = keys.next()
-                evals[k.toInt()] = evalsObj.getInt(k)
-            }
-            ResumeGame(
-                modeName = o.optString("mode", "PVP"),
-                levelLabel = o.optString("level", "普通"),
-                humanSideRed = o.optBoolean("humanRed", true),
-                handicapLabel = o.optString("handicap", "不让子"),
-                strength = o.optInt("strength", 5),
-                clockMinutes = o.optInt("clock", 0),
-                redMs = o.optLong("redMs", 0L),
-                blackMs = o.optLong("blackMs", 0L),
-                initialFen = o.optString("fen", ""),
-                movesUci = moves,
-                evals = evals,
-                savedAtMs = o.optLong("savedAt", 0L),
-                recordId = if (o.has("recordId")) o.getLong("recordId") else null
-            )
+            resumeGameFromJson(JSONObject(file.readText()))
         } catch (_: Exception) {
             null
         }
@@ -78,25 +113,7 @@ class ResumeStore(context: Context) {
 
     fun save(game: ResumeGame) {
         try {
-            val o = JSONObject()
-            o.put("mode", game.modeName)
-            o.put("level", game.levelLabel)
-            o.put("humanRed", game.humanSideRed)
-            o.put("handicap", game.handicapLabel)
-            o.put("strength", game.strength)
-            o.put("clock", game.clockMinutes)
-            o.put("redMs", game.redMs)
-            o.put("blackMs", game.blackMs)
-            o.put("fen", game.initialFen)
-            val moves = JSONArray()
-            for (m in game.movesUci) moves.put(m)
-            o.put("moves", moves)
-            val evals = JSONObject()
-            for ((k, v) in game.evals) evals.put(k.toString(), v)
-            o.put("evals", evals)
-            o.put("savedAt", game.savedAtMs)
-            if (game.recordId != null) o.put("recordId", game.recordId)
-            file.writeText(o.toString())
+            file.writeText(resumeGameToJson(game).toString())
         } catch (_: Exception) {
             // A failed snapshot must never break the game itself.
         }

@@ -93,8 +93,8 @@ class SettingsStore(context: Context) {
 
 /** Full data backup: records + wrong book + settings + training
  *  progress (puzzle solves and guess statistics, since 1.22.0)
- *  in one JSON document. Engine files are not included (they
- *  ship in the APK). */
+ *  + the game in progress (since 1.75.0) in one JSON document.
+ *  Engine files are not included (they ship in the APK). */
 fun buildBackupJson(context: Context): String {
     val root = JSONObject()
     root.put("app", "jiang-xiangqi-backup")
@@ -138,6 +138,12 @@ fun buildBackupJson(context: Context): String {
     root.put("settings", SettingsStore(context).toJson())
     root.put("puzzles", PuzzleProgressStore(context).load().encode())
     root.put("guessStats", encodeGuessStats(GuessStatsStore(context).allStats()))
+    // The game in progress (1.75.0): the backup coverage audit
+    // found it was the one piece of user data left behind —
+    // records, progress and settings all travelled, but a game
+    // stopped halfway silently vanished on a device change.
+    // Carried only when one exists.
+    ResumeStore(context).load()?.let { root.put("resume", resumeGameToJson(it)) }
     return root.toString()
 }
 
@@ -229,8 +235,19 @@ fun applyBackupJson(context: Context, text: String): String? {
             progressNote += "，猜一选统计"
         }
     }
+    // Game in progress (1.75.0): restored only when the backup
+    // carries one — a backup made before 1.75.0, or made with
+    // no game running, must not wipe the game in progress on
+    // this device (the same field-missing rule as above).
+    var resumeNote = ""
+    root.optJSONObject("resume")?.let { resumeObj ->
+        resumeGameFromJson(resumeObj)?.let { game ->
+            ResumeStore(context).save(game)
+            resumeNote = "，未完成对局一盘（回首页可继续）"
+        }
+    }
     return "恢复完成：棋谱 " + records.size + " 局，错题 " + wrong.size +
-        " 道，设置已覆盖" + progressNote + "。主题若有变化，回到首页即可看到。"
+        " 道，设置已覆盖" + progressNote + resumeNote + "。主题若有变化，回到首页即可看到。"
 }
 
 /** Training-only portable document (1.30.0): puzzle progress
