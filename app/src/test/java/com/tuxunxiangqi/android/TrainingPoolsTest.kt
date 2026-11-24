@@ -26,6 +26,18 @@ class TrainingPoolsTest {
         )
     }
 
+    /** The three hand-written guess pools must not repeat a
+     *  position (1.74.0 audit): sharing positions with the
+     *  puzzle library is by design (classic positions reused
+     *  as guess material), but a repeat inside or across the
+     *  pools themselves would be dead weight in a 36-slot set. */
+    @Test
+    fun guessPoolsHaveNoRepeatedPosition() {
+        val boards = (GuessPositions.easy + GuessPositions.normal +
+            GuessPositions.hard).map { it.second.substringBefore(' ') }
+        assertEquals(boards.size, boards.toSet().size)
+    }
+
     @Test
     fun nextUnsolvedPrefersSameCategory() {
         // The 1.38.0 "next unsolved" jump: after puzzle 1
