@@ -36,6 +36,22 @@ import com.tuxunxiangqi.android.data.WrongBookStore
 
 /** Career page computed from the saved records: results against
  *  the engine per difficulty, other modes, puzzle progress. */
+/** Career-page outcome of one AI-game record, read off the
+ *  record's own mode/result labels (both written by the board
+ *  screen in exactly one place, with stable wording). "胜"/"负"
+ *  are from the human's side, "和" a draw, "未完" anything
+ *  without a decided result. Extracted from the page in 1.79.0
+ *  so the classification is unit-testable. */
+fun recordOutcome(r: com.tuxunxiangqi.android.data.GameRecord): String {
+    val humanRed = r.modeLabel.contains("执红")
+    return when {
+        r.resultText.startsWith("和棋") -> "和"
+        r.resultText.startsWith("红方胜") -> if (humanRed) "胜" else "负"
+        r.resultText.startsWith("黑方胜") -> if (humanRed) "负" else "胜"
+        else -> "未完"
+    }
+}
+
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -76,22 +92,13 @@ fun StatsScreen(onBack: () -> Unit) {
     }
 
     val aiGames = records.filter { it.modeLabel.startsWith("人机对弈") }
-    fun outcome(r: com.tuxunxiangqi.android.data.GameRecord): String {
-        val humanRed = r.modeLabel.contains("执红")
-        return when {
-            r.resultText.startsWith("和棋") -> "和"
-            r.resultText.startsWith("红方胜") -> if (humanRed) "胜" else "负"
-            r.resultText.startsWith("黑方胜") -> if (humanRed) "负" else "胜"
-            else -> "未完"
-        }
-    }
-    val finished = aiGames.filter { outcome(it) != "未完" }
-    val wins = finished.count { outcome(it) == "胜" }
-    val losses = finished.count { outcome(it) == "负" }
-    val draws = finished.count { outcome(it) == "和" }
+    val finished = aiGames.filter { recordOutcome(it) != "未完" }
+    val wins = finished.count { recordOutcome(it) == "胜" }
+    val losses = finished.count { recordOutcome(it) == "负" }
+    val draws = finished.count { recordOutcome(it) == "和" }
     val levels = listOf("高手", "普通", "休闲")
     val bestBeaten = levels.firstOrNull { lv ->
-        finished.any { it.modeLabel.contains(lv) && outcome(it) == "胜" }
+        finished.any { it.modeLabel.contains(lv) && recordOutcome(it) == "胜" }
     }
     val pvpCount = records.count { it.modeLabel.startsWith("人人对弈") }
     val spectacleCount = records.count { it.modeLabel.startsWith("AI 表演赛") }
@@ -132,9 +139,9 @@ fun StatsScreen(onBack: () -> Unit) {
                 for (lv in levels) {
                     val games = finished.filter { it.modeLabel.contains(lv) }
                     if (games.isNotEmpty()) {
-                        val w = games.count { outcome(it) == "胜" }
-                        val l = games.count { outcome(it) == "负" }
-                        val d = games.count { outcome(it) == "和" }
+                        val w = games.count { recordOutcome(it) == "胜" }
+                        val l = games.count { recordOutcome(it) == "负" }
+                        val d = games.count { recordOutcome(it) == "和" }
                         Text(
                             text = "$lv 档：" + games.size + " 局（胜 $w · 负 $l · 和 $d）",
                             style = MaterialTheme.typography.bodyMedium
@@ -146,9 +153,9 @@ fun StatsScreen(onBack: () -> Unit) {
                     "执黑" to finished.filter { it.modeLabel.contains("执黑") }
                 )) {
                     if (sideGames.isNotEmpty()) {
-                        val w = sideGames.count { outcome(it) == "胜" }
-                        val l = sideGames.count { outcome(it) == "负" }
-                        val d = sideGames.count { outcome(it) == "和" }
+                        val w = sideGames.count { recordOutcome(it) == "胜" }
+                        val l = sideGames.count { recordOutcome(it) == "负" }
+                        val d = sideGames.count { recordOutcome(it) == "和" }
                         Text(
                             text = "$sideLabel：" + sideGames.size +
                                 " 局（胜 $w · 负 $l · 和 $d）",
