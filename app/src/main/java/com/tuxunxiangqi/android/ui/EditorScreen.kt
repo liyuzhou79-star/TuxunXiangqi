@@ -69,7 +69,7 @@ fun validatePosition(cells: List<Piece?>): String? {
         Triple(PieceType.CANNON, 2, "炮"),
         Triple(PieceType.ADVISOR, 2, "仕/士"),
         Triple(PieceType.ELEPHANT, 2, "相/象"),
-        Triple(PieceType.PAWN, 5, "兵/卒")
+        Triple(PieceType.SOLDIER, 5, "兵/卒")
     )
     for (side in Side.values()) {
         val sideName = if (side == Side.RED) "红方" else "黑方"
