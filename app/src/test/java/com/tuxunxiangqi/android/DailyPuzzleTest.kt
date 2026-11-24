@@ -50,6 +50,25 @@ class DailyPuzzleTest {
         assertEquals(7, ids.toSet().size)
     }
     @Test
+    fun aWeekAcrossNewYearAreAllDifferentPuzzles() {
+        // The 1.77.0 daily-logic audit's one uncovered edge:
+        // the catch-up strip walks by epoch day, but the puzzle
+        // is picked by day-of-year, which wraps at New Year
+        // (365/366 -> 1). The wrapped indices must still land
+        // on seven different puzzles — checked for a common
+        // year-end and a leap year-end.
+        for (jan3 in listOf(
+            java.time.LocalDate.of(2027, 1, 3),
+            java.time.LocalDate.of(2029, 1, 3)
+        )) {
+            val ids = Puzzles.recentDailyDays(jan3.toEpochDay()).map {
+                Puzzles.dailyForEpochDay(it).id
+            }
+            assertEquals(7, ids.toSet().size)
+        }
+    }
+
+    @Test
     fun recentDailyStatusWalksTheLastSevenDays() {
         // Career-page dot row data (1.33.0): oldest first,
         // today last, flags straight from the solved-day set.
