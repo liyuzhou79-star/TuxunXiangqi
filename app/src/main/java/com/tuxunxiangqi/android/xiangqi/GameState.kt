@@ -323,6 +323,21 @@ object Rules {
         }
         return out
     }
+
+    /** A local-rules stand-in move for [side], used when the
+     *  engine cannot move: it errored, answered "(none)", or
+     *  offered a move our rules reject (positions built in the
+     *  editor can be ones the engine's own rulebook refuses).
+     *  The engine side must never quit mid-game (1.85.0), so any
+     *  legal move beats no move: the greediest capture wins,
+     *  otherwise the first legal move in scan order. Null only
+     *  when the side genuinely has no legal move — and then the
+     *  game is already over by checkmate or stalemate. */
+    fun fallbackMove(cells: List<Piece?>, side: Side): Move? {
+        val moves = allLegalMoves(cells, side)
+        if (moves.isEmpty()) return null
+        return moves.maxByOrNull { it.captured?.let { p -> materialValue(p.type) } ?: 0 }
+    }
 }
 
 /** Mutable game state for the prototype board screen. */

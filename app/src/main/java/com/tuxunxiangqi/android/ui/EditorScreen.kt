@@ -46,77 +46,7 @@ import com.tuxunxiangqi.android.xiangqi.GameState
 import com.tuxunxiangqi.android.xiangqi.Piece
 import com.tuxunxiangqi.android.xiangqi.PieceType
 import com.tuxunxiangqi.android.xiangqi.Pos
-import com.tuxunxiangqi.android.xiangqi.Rules
 import com.tuxunxiangqi.android.xiangqi.Side
-
-/** Position validation for the editor: returns a plain-language
- *  problem, or null when the position can start a game. */
-fun validatePosition(cells: List<Piece?>): String? {
-    val redG = Rules.generalPos(cells, Side.RED)
-    val blackG = Rules.generalPos(cells, Side.BLACK)
-    if (redG == null) return "红方还没有放帅"
-    if (blackG == null) return "黑方还没有放将"
-    // Piece-count caps (1.76.0 audit): the palette places pieces
-    // freely, and until now nothing stopped a position with two
-    // red generals or six chariots from starting a game — the
-    // rules layer treats every general-typed piece as royal and
-    // uncapturable, and the engine's behaviour on such FENs is
-    // undefined. One general per side; the standard set otherwise.
-    val caps: List<Triple<PieceType, Int, String>> = listOf(
-        Triple(PieceType.GENERAL, 1, "将帅"),
-        Triple(PieceType.CHARIOT, 2, "车"),
-        Triple(PieceType.HORSE, 2, "马"),
-        Triple(PieceType.CANNON, 2, "炮"),
-        Triple(PieceType.ADVISOR, 2, "仕/士"),
-        Triple(PieceType.ELEPHANT, 2, "相/象"),
-        Triple(PieceType.SOLDIER, 5, "兵/卒")
-    )
-    for (side in Side.values()) {
-        val sideName = if (side == Side.RED) "红方" else "黑方"
-        for ((type, cap, label) in caps) {
-            val n = cells.count { it != null && it.type == type && it.side == side }
-            if (n > cap) {
-                return if (type == PieceType.GENERAL) {
-                    sideName + "只能放一个" + if (side == Side.RED) "帅" else "将"
-                } else {
-                    sideName + label + "最多放" + cap + "个，现在有" + n + "个"
-                }
-            }
-        }
-    }
-    fun inPalace(side: Side, p: Pos): Boolean {
-        if (p.col !in 3..5) return false
-        return if (side == Side.RED) p.row in 7..9 else p.row in 0..2
-    }
-    if (!inPalace(Side.RED, redG)) return "红帅必须放在红方九宫里"
-    if (!inPalace(Side.BLACK, blackG)) return "黑将必须放在黑方九宫里"
-    if (redG.col == blackG.col) {
-        var blocked = false
-        val lo = minOf(redG.row, blackG.row)
-        val hi = maxOf(redG.row, blackG.row)
-        for (r in (lo + 1) until hi) {
-            if (cells[r * 9 + redG.col] != null) blocked = true
-        }
-        if (!blocked) return "将帅不能照面，中间至少要隔一个棋子"
-    }
-    // Advisors must be in the palace, elephants on their own half.
-    for (r in 0..9) {
-        for (c in 0..8) {
-            val p = cells[r * 9 + c] ?: continue
-            val pos = Pos(c, r)
-            when (p.type) {
-                PieceType.ADVISOR ->
-                    if (!inPalace(p.side, pos)) return "仕/士只能放在九宫里"
-                PieceType.ELEPHANT -> {
-                    val ok = if (p.side == Side.RED) r in 5..9 else r in 0..4
-                    if (!ok) return "相/象不能过河"
-                }
-                else -> {}
-            }
-        }
-    }
-    return null
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -144,7 +74,6 @@ fun EditorScreen(
     var tool by remember { mutableStateOf<Piece?>(Piece(PieceType.CHARIOT, Side.RED)) }
     var erase by remember { mutableStateOf(false) }
     var version by remember { mutableStateOf(0) }
-    val problem = remember(version) { validatePosition(state.cells) }
     // FEN of the position being edited (the editor always starts
     // Red to move), plus the paste-a-FEN import dialog state.
     val fenText = remember(version) { Fen.toFen(state.cells, Side.RED) }
@@ -253,22 +182,17 @@ fun EditorScreen(
                 ) { Text("恢复初始局面") }
             }
             Spacer(Modifier.height(12.dp))
-            if (problem != null) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = problem,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-            }
+            // The editor is a free sandbox (1.85.0): any layout
+            // may start a game — missing generals, doubled pieces,
+            // facing generals included. Nothing here blocks the
+            // start buttons; positions the engine cannot read are
+            // played on with local-rules moves instead.
+            Text(
+                text = "想怎么摆就怎么摆：缺将、双帅、六个兵、将帅照面，都可以直接开局。引擎认不出的怪局面，会用本地规则接着走，不会卡住。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -318,7 +242,6 @@ fun EditorScreen(
             Row(modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = { onStart(state.cells.toList(), BoardMode.PVP) },
-                    enabled = problem == null,
                     modifier = Modifier
                         .weight(1f)
                         .padding(end = 8.dp)
@@ -327,7 +250,6 @@ fun EditorScreen(
                 }
                 Button(
                     onClick = { onStart(state.cells.toList(), BoardMode.AI) },
-                    enabled = problem == null,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("人机对弈")

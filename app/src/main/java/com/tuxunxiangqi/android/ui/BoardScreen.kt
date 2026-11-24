@@ -393,9 +393,6 @@ fun BoardScreen(
                 ?.map { it.key to it.value } ?: emptyList()
         )
     }
-    var lastRedCp by remember {
-        mutableStateOf<Int?>(evalPoints.lastOrNull()?.second)
-    }
     var showTrendDialog by remember { mutableStateOf(false) }
     // Dialogs / messages.
     var showResignDialog by remember { mutableStateOf(false) }
@@ -435,7 +432,6 @@ fun BoardScreen(
     fun addEvalPoint(moveCount: Int, redCp: Int) {
         val cleaned = evalPoints.filter { it.first != moveCount }
         evalPoints = (cleaned + (moveCount to redCp)).sortedBy { it.first }
-        lastRedCp = redCp
     }
 
     fun clearAnalysis() {
@@ -610,24 +606,39 @@ fun BoardScreen(
         val cap = if (mode == BoardMode.AI) effectiveDepthCap(level, strength) else null
         engine.compute(fen, movetime, cap) { res, err ->
             thinking = false
-            when {
-                err != null -> engineError = err
-                res != null -> {
-                    val mv = Fen.parseUciMove(res.bestMoveUci)
-                    if (mv == null || !state.tryMove(mv.first, mv.second)) {
-                        engineError = "引擎给的着法对不上棋盘，请重开一局。"
-                    } else {
-                        selected = null
-                        clearAnalysis()
-                        val (redCp, redMate) = EvalUtil.toRedPerspective(
-                            res.scoreCp, res.mateIn, engineSide
-                        )
-                        addEvalPoint(
-                            state.moveCount,
-                            redMate?.let { if (it > 0) 1500 else -1500 }
-                                ?: (redCp ?: 0)
-                        )
-                    }
+            // A stale answer (the game moved on, or already ended)
+            // is dropped, never applied to the wrong side.
+            if (state.result != null || state.turn != engineSide) return@compute
+            val mv = res?.let { Fen.parseUciMove(it.bestMoveUci) }
+            if (err == null && res != null && mv != null &&
+                state.tryMove(mv.first, mv.second)
+            ) {
+                selected = null
+                clearAnalysis()
+                val (redCp, redMate) = EvalUtil.toRedPerspective(
+                    res.scoreCp, res.mateIn, engineSide
+                )
+                addEvalPoint(
+                    state.moveCount,
+                    redMate?.let { if (it > 0) 1500 else -1500 }
+                        ?: (redCp ?: 0)
+                )
+            } else {
+                // The engine side never quits mid-game (1.85.0):
+                // an engine error, a "(none)" answer, or a move
+                // our rules reject (editor-built positions can be
+                // ones the engine's rulebook refuses) falls back
+                // to a local-rules move, however bad the position
+                // is. The game only ever ends by real checkmate
+                // or stalemate, the user's own resign / draw, or
+                // the clock — never because the engine gave up.
+                val fb = Rules.fallbackMove(state.cells, engineSide)
+                if (fb != null && state.tryMove(fb.from, fb.to)) {
+                    selected = null
+                    clearAnalysis()
+                    notice = "引擎这步没算出来，已按本地规则替它走了一步，棋局继续。"
+                } else if (err != null) {
+                    engineError = err
                 }
             }
         }
@@ -1428,19 +1439,16 @@ fun BoardScreen(
                 onDismissRequest = { showDrawDialog = false },
                 title = { Text("向引擎求和？") },
                 text = {
-                    Text("引擎只在局势接近、或者它并不占优的时候才会同意和棋。")
+                    Text("求和由你说了算：点「求和」这一局就以和棋结束，引擎不会按局势拒绝。")
                 },
                 confirmButton = {
                     TextButton(onClick = {
                         showDrawDialog = false
-                        val humanCp = lastRedCp?.let {
-                            if (humanSide == Side.RED) it else -it
-                        }
-                        if (humanCp != null && humanCp >= -80) {
-                            state.forceResult(null, "引擎同意和棋")
-                        } else {
-                            notice = "引擎拒绝了和棋：现在的局势对它更有利，或者还没有算清。"
-                        }
+                        // A draw is the user's call alone (1.85.0):
+                        // the old score gate (engine agrees only
+                        // when not better) was the engine deciding
+                        // an ending by evaluation — removed.
+                        state.forceResult(null, "双方同意和棋")
                     }) {
                         Text("求和")
                     }

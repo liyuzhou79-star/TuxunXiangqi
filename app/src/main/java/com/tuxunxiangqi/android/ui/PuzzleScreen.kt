@@ -561,6 +561,25 @@ private fun PuzzlePlay(
             if (usedHint) "这轮用过提示，题目列表里会如实标出来。" else ""
     }
 
+    /** Applies a Black (engine-side) reply: move text, status
+     *  line and the solved check live in exactly one place, so a
+     *  local-rules stand-in move ([local], 1.85.0) behaves
+     *  identically to a real engine reply. Returns false when the
+     *  move does not land on the board. */
+    fun blackReply(from: Pos, to: Pos, local: Boolean): Boolean {
+        val text = Notation.moveText(gs.cells, from, to)
+        if (!gs.tryMove(from, to)) return false
+        status = "黑方走了「$text」。" + (lastJudge ?: "") +
+            if (local) "（引擎没算出着法，这步是本地规则替它走的。）" else ""
+        if (gs.result != null && gs.result!!.winner == Side.RED) {
+            solved = true
+            onSolved(puzzle.id, userMoves, usedHint)
+            SoundFx.play(context, SoundKind.MATE_VOICE)
+            status = solvedStatus()
+        }
+        return true
+    }
+
     fun afterUserMove() {
         userMoves++
         selected = null
@@ -596,21 +615,19 @@ private fun PuzzlePlay(
             }
             engine.compute(Fen.toFen(gs), 800) { eres, eerr ->
                 busy = false
-                if (eres != null) {
-                    val mv = Fen.parseUciMove(eres.bestMoveUci)
-                    if (mv != null) {
-                        val text = Notation.moveText(gs.cells, mv.first, mv.second)
-                        gs.tryMove(mv.first, mv.second)
-                        status = "黑方走了「$text」。" + (lastJudge ?: "")
-                        if (gs.result != null && gs.result!!.winner == Side.RED) {
-                            solved = true
-                            onSolved(puzzle.id, userMoves, usedHint)
-                            SoundFx.play(context, SoundKind.MATE_VOICE)
-                            status = solvedStatus()
-                        }
+                val mv = eres?.let { Fen.parseUciMove(it.bestMoveUci) }
+                val played = mv != null && blackReply(mv.first, mv.second, local = false)
+                if (!played) {
+                    // The defending side never stalls the puzzle
+                    // (1.85.0): an engine error, a "(none)" answer
+                    // or an unplayable engine move falls back to a
+                    // local-rules move, so the solve can continue.
+                    val fb = Rules.fallbackMove(gs.cells, Side.BLACK)
+                    if (fb != null) {
+                        blackReply(fb.from, fb.to, local = true)
+                    } else if (eerr != null) {
+                        status = "引擎没能走棋：$eerr"
                     }
-                } else if (eerr != null) {
-                    status = "引擎没能走棋：$eerr"
                 }
             }
         }
@@ -624,21 +641,26 @@ private fun PuzzlePlay(
             busy = true
             engine.compute(Fen.toFen(gs), 700) { eres, _ ->
                 busy = false
-                if (eres != null) {
-                    val mv = Fen.parseUciMove(eres.bestMoveUci)
-                    if (mv != null) {
-                        if (gs.turn == Side.RED) userMoves++
-                        gs.tryMove(mv.first, mv.second)
-                        status = "演示中……（引擎双方对弈）"
-                        if (gs.result != null) {
-                            demoOn = false
-                            if (gs.result!!.winner == Side.RED) {
-                                solved = true
-                                onSolved(puzzle.id, null, false)
-                                status = "演示结束：红方胜（" + gs.result!!.reason + "）。轮到你自己解一次。"
-                            } else {
-                                status = "演示结束：红方没赢——这题比演示的路线更讲究，自己试试。"
-                            }
+                var mv = eres?.let { Fen.parseUciMove(it.bestMoveUci) }
+                if (mv == null || !Rules.isLegal(gs.cells, mv.first, mv.second)) {
+                    // Same never-stall rule as the live defence
+                    // (1.85.0): a missing or unplayable engine move
+                    // becomes a local-rules move.
+                    mv = Rules.fallbackMove(gs.cells, gs.turn)
+                        ?.let { it.from to it.to }
+                }
+                if (mv != null) {
+                    if (gs.turn == Side.RED) userMoves++
+                    gs.tryMove(mv.first, mv.second)
+                    status = "演示中……（引擎双方对弈）"
+                    if (gs.result != null) {
+                        demoOn = false
+                        if (gs.result!!.winner == Side.RED) {
+                            solved = true
+                            onSolved(puzzle.id, null, false)
+                            status = "演示结束：红方胜（" + gs.result!!.reason + "）。轮到你自己解一次。"
+                        } else {
+                            status = "演示结束：红方没赢——这题比演示的路线更讲究，自己试试。"
                         }
                     }
                 }
