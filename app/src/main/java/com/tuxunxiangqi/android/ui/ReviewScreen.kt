@@ -321,6 +321,10 @@ fun ReviewScreen(
             // Cached under the analysed step even if the user has
             // stepped elsewhere meanwhile — nothing is thrown away.
             when {
+                // (null, null): a newer request preempted this
+                // analysis (1.305.0) — interrupted, not an error,
+                // so nothing is recorded against the step.
+                res == null && err == null -> Unit
                 err != null -> deepErrors[atIdx] = err
                 res != null -> {
                     deepCache[atIdx] = res

@@ -211,7 +211,8 @@ fun GuessScreen(onBack: () -> Unit) {
         engine.analyze(fenNow, 900, multiPv = 4) { res, err ->
             busy = false
             if (err != null || res == null || res.candidates.isEmpty()) {
-                verdict = "引擎没能给出答案（$err），这题不算，换一题吧。"
+                verdict = "引擎没能给出答案" +
+                    (err?.let { "（$it）" } ?: "") + "，这题不算，换一题吧。"
                 revealed = true
                 return@analyze
             }
