@@ -367,7 +367,15 @@ fun ReviewScreen(
     val swingMoves = remember(swings) { swings.map { it.first } }
 
     fun compareWithEngine() {
-        if (compareBusy) return
+        // Exclusion with the batch run and deep analysis, same
+        // as startDeepAnalysis has always had (1.310.0): the
+        // compare used to be gated only by its own busy flag, so
+        // during a minutes-long batch run a tap preempted the
+        // batch's current step (that step silently lost its
+        // score) and the batch's next step then preempted the
+        // compare, which misreported the interruption as "no
+        // candidates".
+        if (compareBusy || batchRunning || deepBusy) return
         val actualUci = liveRecord.movesUci.getOrNull(idx) ?: run {
             compareText = "已经是最后一手了，没有下一步可对比。"
             return
@@ -379,6 +387,10 @@ fun ReviewScreen(
             val best = res?.candidates?.firstOrNull()
             compareText = when {
                 err != null -> "引擎没能完成分析：$err"
+                // (null, null): preempted by a newer request
+                // (1.305.0) — an interruption, not an empty
+                // answer (1.310.0).
+                res == null -> "这次对比被其他分析打断了，请再点一次。"
                 best == null -> "引擎暂时没给出候选。"
                 else -> {
                     val actualText = notations.getOrNull(idx) ?: actualUci
@@ -647,7 +659,7 @@ fun ReviewScreen(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = { compareWithEngine() },
-                        enabled = !compareBusy
+                        enabled = !compareBusy && !batchRunning && !deepBusy
                     ) { Text("和引擎一选对比") }
                     if (swingMoves.isNotEmpty()) {
                         OutlinedButton(onClick = {
