@@ -46,7 +46,7 @@ class PuzzleFenTest {
     @Test
     fun allPuzzleFensAreSane() {
         for (p in Puzzles.all) checkFen(p.fen)
-        assertEquals(558, Puzzles.all.size)
+        assertEquals(562, Puzzles.all.size)
     }
 
     /** No two puzzles may share a position (1.71.0): the full
