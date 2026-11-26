@@ -400,6 +400,14 @@ fun BoardScreen(
     var notice by remember { mutableStateOf<String?>(null) }
 
     val busy = thinking || analysisBusy
+    // Interaction gate (1.307.0): only the engine's own thinking
+    // blocks play. An advisory analysis must NOT freeze the
+    // board — its result is discarded by the move-count check
+    // when the position has moved on, so moves, undo, restart,
+    // saving and resign/draw offers all stay live while it runs.
+    // Before this, `busy` (which includes analysisBusy) gated
+    // every one of them, and with auto-analysis on, each move
+    // was followed by up to seconds of dead taps.
     val humanTurn = when (mode) {
         BoardMode.PVP -> true
         BoardMode.AI -> state.turn == humanSide
@@ -772,7 +780,7 @@ fun BoardScreen(
     }
 
     fun restart() {
-        if (busy) return
+        if (thinking) return
         resumeStore.clear()
         savedRecordId = null
         finalSaved = false
@@ -786,7 +794,7 @@ fun BoardScreen(
     }
 
     fun undo() {
-        if (busy) return
+        if (thinking) return
         selected = null
         clearAnalysis()
         engineError = null
@@ -805,7 +813,7 @@ fun BoardScreen(
     }
 
     fun onTap(pos: Pos) {
-        if (state.result != null || busy || !humanTurn) return
+        if (state.result != null || thinking || !humanTurn) return
         val piece = state.pieceAt(pos)
         val sel = selected
         when {
@@ -930,7 +938,7 @@ fun BoardScreen(
                     }
                     OutlinedButton(
                         onClick = { undo() },
-                        enabled = state.lastMove != null && !busy,
+                        enabled = state.lastMove != null && !thinking,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("悔棋")
@@ -1176,7 +1184,7 @@ fun BoardScreen(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = { undo() },
-                        enabled = state.lastMove != null && !busy
+                        enabled = state.lastMove != null && !thinking
                     ) {
                         Text("悔棋")
                     }
@@ -1186,12 +1194,15 @@ fun BoardScreen(
                     ) {
                         Text("分析")
                     }
-                    OutlinedButton(onClick = { restart() }) {
+                    OutlinedButton(
+                        onClick = { restart() },
+                        enabled = !thinking
+                    ) {
                         Text("重开")
                     }
                     OutlinedButton(
                         onClick = { saveRecord(final = state.result != null) },
-                        enabled = !busy
+                        enabled = !thinking
                     ) {
                         Text("存谱")
                     }
@@ -1220,13 +1231,13 @@ fun BoardScreen(
                     if (mode != BoardMode.SPECTACLE) {
                         OutlinedButton(
                             onClick = { showResignDialog = true },
-                            enabled = state.result == null && !busy
+                            enabled = state.result == null && !thinking
                         ) {
                             Text("认输")
                         }
                         OutlinedButton(
                             onClick = { showDrawDialog = true },
-                            enabled = state.result == null && !busy
+                            enabled = state.result == null && !thinking
                         ) {
                             Text("求和")
                         }
