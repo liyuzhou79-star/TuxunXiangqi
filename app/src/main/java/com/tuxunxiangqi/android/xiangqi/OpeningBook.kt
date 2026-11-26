@@ -3619,6 +3619,36 @@ object OpeningBook {
             "h1h0" to "车二退一",
             "b4b5" to "炮八进一",
         ),
+        "h2e2 h7e7 h0g2 h9g7 b0c2 b9c7 b2b4 i9h9 c3c4 c6c5 g3g4 g6g5 a3a4 h9h8 i0h0 a9a8 g4g5 e6e5 g5g6 a6a5 e3e4 i6i5 i3i4 a8a7 a0a1 a7a6 a1a2 h8h7 a2a3 h7h6 h0h1 h6h5 h1h2 h5h4 h2h3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6 a2a3 a6a7 a3a2 a7a6" to listOf(
+            "a2a3" to "车九进一",
+            "h3h2" to "车二退一",
+            "b4b5" to "炮八进一",
+        ),
+        "h2e2 h9g7 h0g2 a9a8 b0c2 b9c7 i0h0 g6g5 b2b4 i9h9 g3g4 c6c5 a3a4 g9e7 c3c4 h9h8 g4g5 h8h9 g5g6 a6a5 e3e4 e6e5 i3i4 i6i5 a0a1 a8a7 a1a2 a7a6 a2a3 h9h8 h0h1 a6a7 h1h2 a7a6 h2h3 a6a7 h3h4 a7a6 h4h5 a6a7 h5h6 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6" to listOf(
+            "a3a2" to "车九退一",
+            "h6h5" to "车二退一",
+            "b4b5" to "炮八进一",
+        ),
+        "c3c4 c6c5 c4c5 h9g7 h2e2 b9c7 h0g2 g9e7 b2b4 i9h9 b0c2 a9a8 g3g4 g6g5 a3a4 h9h8 i0h0 a8a7 g4g5 a6a5 c5c6 e6e5 e3e4 i6i5 g5g6 i5i4 a0a1 a7a6 a1a2 a6a7 a2a3 a7a6 h0h1 a6a7 h1h2 a7a6 h2h3 a6a7 h3h4 a7a6 h4h5 a6a7 h5h6 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7" to listOf(
+            "a2a3" to "车九进一",
+            "h6h5" to "车二退一",
+            "b4b5" to "炮八进一",
+        ),
+        "h2e2 b9c7 h0g2 c6c5 b0c2 h9g7 i0h0 i9h9 c3c4 a9a8 b2b4 g9e7 g3g4 g6g5 a3a4 h9h8 g4g5 h8h9 g5g6 a6a5 e3e4 e6e5 i3i4 i6i5 a0a1 a8a7 a1a2 a7a6 a2a3 h9h8 h0h1 a6a7 h1h2 a7a6 h2h3 a6a7 h3h4 a7a6 h4h5 a6a7 h5h6 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6 a3a2 a6a7 a2a3 a7a6" to listOf(
+            "a3a2" to "车九退一",
+            "h6h5" to "车二退一",
+            "b4b5" to "炮八进一",
+        ),
+        "h2e2 h7e7 h0g2 h9g7 b0c2 b9c7 b2b4 i9h9 g3g4 c6c5 c3c4 g6g5 a3a4 h9h8 i0h0 a9a8 g4g5 e6e5 g5g6 a8a7 a4a5 e5e4 i3i4 i6i5 a0a1 h8h7 a1a2 h7h6 a2a3 h6h5 a3a4 h5h4 h0h1 h4h3 h1h2 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4" to listOf(
+            "a7a8" to "车1退1",
+            "h3h4" to "车8退1",
+            "b7b6" to "炮2进1",
+        ),
+        "g0e2 c9e7 b2b4 b9c7 h0g2 h9g7 i0h0 i9h9 g3g4 c6c5 a3a4 g6g5 c3c4 a9a8 b0c2 h9h8 a4a5 e6e5 g4g5 a8a7 e3e4 i6i5 g5g6 i5i4 a0a1 a7a8 a1a2 a8a7 a2a3 a7a8 a3a4 a8a7 h0h1 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3 a8a7 a3a4 a7a8 a4a3" to listOf(
+            "a8a7" to "车1进1",
+            "h8h9" to "车8退1",
+            "b7b6" to "炮2进1",
+        ),
     )
 
     fun knownHistories(): Set<String> = book.keys
