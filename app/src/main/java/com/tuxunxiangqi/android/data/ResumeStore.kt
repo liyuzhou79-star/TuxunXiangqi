@@ -97,32 +97,90 @@ fun resumeGameFromJson(o: JSONObject): ResumeGame? {
     }
 }
 
-/** JSON file storage for the single in-progress game. */
+/** JSON file storage for the single in-progress game.
+ *
+ *  Since 1.312.0 the disk write no longer happens on the
+ *  caller's thread: the board page snapshots after EVERY move,
+ *  and serialising the whole game plus writing the file on the
+ *  main thread cost more the longer the game ran. The latest
+ *  snapshot now lives in a process-wide in-memory mirror that
+ *  save/clear update synchronously (so every reader — the home
+ *  card, the backup export — sees the newest state at once,
+ *  across store instances), while the actual file write/delete
+ *  is queued onto one background thread in call order, so a
+ *  queued save can never resurrect a game that was cleared
+ *  after it. A crash can lose at most the snapshot of the move
+ *  being played; the file on disk is never more than one move
+ *  behind. */
 class ResumeStore(context: Context) {
 
     private val file = File(context.applicationContext.filesDir, "inprogress.json")
 
     fun load(): ResumeGame? {
-        if (!file.exists()) return null
-        return try {
-            resumeGameFromJson(JSONObject(file.readText()))
+        synchronized(mirrorLock) {
+            if (mirrorKnown) return mirror
+        }
+        val fromDisk = try {
+            if (!file.exists()) {
+                null
+            } else {
+                resumeGameFromJson(JSONObject(file.readText()))
+            }
         } catch (_: Exception) {
             null
+        }
+        synchronized(mirrorLock) {
+            // A save/clear may have landed while the file was
+            // being read; the mirror is newer than the disk then.
+            if (!mirrorKnown) {
+                mirror = fromDisk
+                mirrorKnown = true
+            }
+            return mirror
         }
     }
 
     fun save(game: ResumeGame) {
-        try {
-            file.writeText(resumeGameToJson(game).toString())
-        } catch (_: Exception) {
-            // A failed snapshot must never break the game itself.
+        synchronized(mirrorLock) {
+            mirror = game
+            mirrorKnown = true
+        }
+        writer.execute {
+            try {
+                file.writeText(resumeGameToJson(game).toString())
+            } catch (_: Exception) {
+                // A failed snapshot must never break the game itself.
+            }
         }
     }
 
     fun clear() {
-        try {
-            if (file.exists()) file.delete()
-        } catch (_: Exception) {
+        synchronized(mirrorLock) {
+            mirror = null
+            mirrorKnown = true
+        }
+        writer.execute {
+            try {
+                if (file.exists()) file.delete()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private companion object {
+        val mirrorLock = Any()
+
+        /** The newest snapshot as known in this process; only
+         *  meaningful while [mirrorKnown] is true (a cleared game
+         *  is a known null, not an unknown). */
+        var mirrorKnown = false
+        var mirror: ResumeGame? = null
+
+        /** Single ordered writer: saves and clears hit the disk
+         *  in exactly the order they were requested. Never shut
+         *  down, so execute() cannot reject. */
+        val writer = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+            Thread(r, "resume-store").apply { isDaemon = true }
         }
     }
 }
