@@ -12,8 +12,8 @@ android {
         applicationId = "com.tuxunxiangqi.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 295
-        versionName = "1.284.0"
+        versionCode = 296
+        versionName = "1.285.0"
     }
 
     signingConfigs {
