@@ -2,10 +2,6 @@ package com.tuxunxiangqi.android.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -132,13 +128,25 @@ private fun rememberPieceBitmaps(): Map<Pair<PieceType, Side>, ImageBitmap> {
 }
 
 @Composable
-private fun rememberWoodBitmap(): ImageBitmap {
+private fun rememberWoodBitmap(): ImageBitmap? {
     val context = LocalContext.current
-    return remember {
-        android.graphics.BitmapFactory.decodeResource(
-            context.resources, R.drawable.board_wood
-        ).asImageBitmap()
+    // Decoded off the main thread (1.308.0): this used to decode
+    // inside remember{} during composition, hitching the first
+    // frame of every screen that shows a board. Until the grain
+    // arrives (and if it ever failed) the gradient and the
+    // procedural grain still render, so the board is never blank.
+    val state = androidx.compose.runtime.produceState<ImageBitmap?>(
+        initialValue = null
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                android.graphics.BitmapFactory.decodeResource(
+                    context.resources, R.drawable.board_wood
+                )?.asImageBitmap()
+            }.getOrNull()
+        }
     }
+    return state.value
 }
 
 @Composable
@@ -154,16 +162,18 @@ fun BoardFrame(
     ) {
         // Real walnut grain under a translucent walnut gradient,
         // so the rim reads as solid dark wood, not a flat fill.
-        Image(
-            bitmap = wood,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            colorFilter = ColorFilter.tint(
-                Color(0xFF8A6A3C),
-                androidx.compose.ui.graphics.BlendMode.Modulate
-            ),
-            modifier = Modifier.matchParentSize()
-        )
+        if (wood != null) {
+            Image(
+                bitmap = wood,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                colorFilter = ColorFilter.tint(
+                    Color(0xFF8A6A3C),
+                    androidx.compose.ui.graphics.BlendMode.Modulate
+                ),
+                modifier = Modifier.matchParentSize()
+            )
+        }
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -246,16 +256,28 @@ fun XiangqiBoard(
     // Check feedback: the general under attack breathes a red
     // ring so the eye lands on it instantly, on top of the
     // "将军！" text the screen already shows.
-    val checkPulse = rememberInfiniteTransition(label = "checkPulse")
-    val pulseAlpha by checkPulse.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            tween(durationMillis = 520),
-            RepeatMode.Reverse
-        ),
-        label = "checkPulseAlpha"
-    )
+    // Driven by an Animatable that only runs while a side is
+    // actually in check (1.308.0) — the previous
+    // rememberInfiniteTransition kept a frame clock running on
+    // every board forever, check or no check.
+    val pulseAnim = remember { Animatable(1f) }
+    LaunchedEffect(state.inCheck) {
+        if (state.inCheck) {
+            while (true) {
+                pulseAnim.animateTo(
+                    0.45f,
+                    tween(durationMillis = 520, easing = FastOutSlowInEasing)
+                )
+                pulseAnim.animateTo(
+                    1f,
+                    tween(durationMillis = 520, easing = FastOutSlowInEasing)
+                )
+            }
+        } else {
+            pulseAnim.snapTo(1f)
+        }
+    }
+    val pulseAlpha = pulseAnim.value
     Canvas(
         modifier = modifier
             .fillMaxWidth()
@@ -530,7 +552,7 @@ private fun DrawScope.drawHintArrow(
 }
 
 private fun DrawScope.drawWoodFace(
-    wood: ImageBitmap,
+    wood: ImageBitmap?,
     cell: Float,
     totalW: Float,
     totalH: Float
@@ -542,16 +564,21 @@ private fun DrawScope.drawWoodFace(
     // Real walnut grain (Wikimedia Commons, CC BY-SA 3.0; see
     // THIRD_PARTY_NOTICES.md), center-cropped to the face's
     // portrait aspect and laid over the warm base so the board
-    // has true photographic grain instead of flat color.
-    val srcW = (wood.height * (totalW / totalH)).toInt()
-        .coerceAtMost(wood.width)
-    drawImage(
-        image = wood,
-        srcOffset = IntOffset((wood.width - srcW) / 2, 0),
-        srcSize = IntSize(srcW, wood.height),
-        dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-        alpha = 0.52f
-    )
+    // has true photographic grain instead of flat color. The
+    // bitmap now decodes off the main thread (1.308.0); while
+    // it is in flight the gradient and procedural grain below
+    // still render.
+    if (wood != null) {
+        val srcW = (wood.height * (totalW / totalH)).toInt()
+            .coerceAtMost(wood.width)
+        drawImage(
+            image = wood,
+            srcOffset = IntOffset((wood.width - srcW) / 2, 0),
+            srcSize = IntSize(srcW, wood.height),
+            dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+            alpha = 0.52f
+        )
+    }
     // Procedural grain: soft darker and lighter streaks running
     // across the board, deterministic so the face never flickers.
     val rnd = Random(20261123)
