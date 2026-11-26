@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -33,6 +35,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -158,7 +161,12 @@ fun BoardFrame(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, FrameDark, RoundedCornerShape(12.dp))
+            .border(1.dp, FrameDark, RoundedCornerShape(12.dp)),
+        // When the board itself is width-capped (landscape /
+        // split-screen, see XiangqiBoard) the frame stays full
+        // width; centre the board inside it instead of leaving
+        // it hugging the left edge (1.309.0).
+        contentAlignment = Alignment.TopCenter
     ) {
         // Real walnut grain under a translucent walnut gradient,
         // so the rim reads as solid dark wood, not a flat fill.
@@ -278,8 +286,23 @@ fun XiangqiBoard(
         }
     }
     val pulseAlpha = pulseAnim.value
+    // Landscape / split-screen guard (1.309.0): the board is
+    // taller than it is wide (totalH > totalW), so sizing purely
+    // by width makes it far taller than the window when the
+    // window is wider than it is tall — the whole board could
+    // never be on screen at once and play meant scrolling
+    // mid-game. Cap the width so the board's height stays
+    // within the window height (minus the top bar and a little
+    // slack; the frame's own padding rides inside that slack).
+    // In portrait the cap sits above every phone's width, so
+    // nothing changes there. screenHeightDp tracks the app
+    // window, so multi-window heights are honoured too.
+    val configuration = LocalConfiguration.current
+    val maxBoardWidth =
+        ((configuration.screenHeightDp - 88).coerceAtLeast(160) * totalW / totalH).dp
     Canvas(
         modifier = modifier
+            .widthIn(max = maxBoardWidth)
             .fillMaxWidth()
             .aspectRatio(totalW / totalH)
             .pointerInput(flipped) {
