@@ -598,12 +598,17 @@ private fun PuzzlePlay(
         }
         busy = true
         status = "引擎防守中……"
-        // Judge first (is Red still clearly winning?), then defend.
-        engine.analyze(Fen.toFen(gs), 500, multiPv = 1) { res, _ ->
-            val best = res?.candidates?.firstOrNull()
-            if (best != null) {
+        // Judge and defence in ONE search (1.306.0): this used to
+        // run a separate 500 ms analysis for the verdict and only
+        // then start the 800 ms defence search, so every reply
+        // took at least 1.3 s. The defence search scores the very
+        // same position (Black to move), so the verdict reads its
+        // returned score instead — one wait, same thresholds.
+        engine.compute(Fen.toFen(gs), 800) { eres, eerr ->
+            busy = false
+            if (eres != null) {
                 val (redCp, redMate) = EvalUtil.toRedPerspective(
-                    best.scoreCp, best.mateIn, gs.turn
+                    eres.scoreCp, eres.mateIn, gs.turn
                 )
                 lastJudge = when {
                     redMate != null && redMate > 0 -> "形势：红方有杀棋在路上。"
@@ -613,21 +618,18 @@ private fun PuzzlePlay(
                     else -> "裁判提醒：这步把优势走没了——建议悔棋重走。"
                 }
             }
-            engine.compute(Fen.toFen(gs), 800) { eres, eerr ->
-                busy = false
-                val mv = eres?.let { Fen.parseUciMove(it.bestMoveUci) }
-                val played = mv != null && blackReply(mv.first, mv.second, local = false)
-                if (!played) {
-                    // The defending side never stalls the puzzle
-                    // (1.85.0): an engine error, a "(none)" answer
-                    // or an unplayable engine move falls back to a
-                    // local-rules move, so the solve can continue.
-                    val fb = Rules.fallbackMove(gs.cells, Side.BLACK)
-                    if (fb != null) {
-                        blackReply(fb.from, fb.to, local = true)
-                    } else if (eerr != null) {
-                        status = "引擎没能走棋：$eerr"
-                    }
+            val mv = eres?.let { Fen.parseUciMove(it.bestMoveUci) }
+            val played = mv != null && blackReply(mv.first, mv.second, local = false)
+            if (!played) {
+                // The defending side never stalls the puzzle
+                // (1.85.0): an engine error, a "(none)" answer
+                // or an unplayable engine move falls back to a
+                // local-rules move, so the solve can continue.
+                val fb = Rules.fallbackMove(gs.cells, Side.BLACK)
+                if (fb != null) {
+                    blackReply(fb.from, fb.to, local = true)
+                } else if (eerr != null) {
+                    status = "引擎没能走棋：$eerr"
                 }
             }
         }
