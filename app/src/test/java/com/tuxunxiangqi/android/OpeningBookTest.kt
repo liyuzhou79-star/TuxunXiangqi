@@ -183,7 +183,7 @@ class OpeningBookTest {
         fun normalise(s: String): String = s
             .replace('傌', '马').replace('馬', '马')
             .replace('俥', '车').replace('車', '车')
-        assertEquals(1034, OpeningBook.knownHistories().size)
+        assertEquals(1040, OpeningBook.knownHistories().size)
         for (history in OpeningBook.knownHistories()) {
             val gs = GameState()
             val moves = if (history.isBlank()) emptyList() else history.split(" ")
